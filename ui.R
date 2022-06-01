@@ -19,7 +19,7 @@ fillPage(theme = shinytheme("united"),
                                          choices = list("Type" = "Type", "Company" = "Company", "Section" = "Section"), 
                                          selected = "Type"),
                              
-                             selectInput("catDisplay", label="Display:", choices=list("Actual"="categoricalValueTable", "Expected"="categoricalExpectedTable","Difference"="categoricalDifferenceTable","Graph"="categoricalBarGraph"), selected="Graph")
+                             selectInput("catDisplay", label="Display:", choices=list("Graph"="categoricalBarGraph", "Actual"="categoricalValueTable", "Expected"="categoricalExpectedTable","Difference"="categoricalDifferenceTable"), selected="Graph")
                            ), # sidebarPanel
                            mainPanel(
                              dataTableOutput("categoricalValueTable"),
@@ -43,7 +43,7 @@ fillPage(theme = shinytheme("united"),
                              
                              textInput("character", "Character to Count (optional):",""),
                              
-                             selectInput("numDisplay", label="Display:", choices=list("Actual"="numericValueTable", "Expected"="numericExpectedTable","Difference"="numericDifferenceTable","Graph"="numericBarGraph"), selected="Graph")
+                             selectInput("numDisplay", label="Display:", choices=list("Graph"="numericBarGraph", "Actual"="numericValueTable", "Expected"="numericExpectedTable","Difference"="numericDifferenceTable"), selected="Graph")
                            ), # sidebarPanel
                            mainPanel(
                              dataTableOutput("numericValueTable"),
