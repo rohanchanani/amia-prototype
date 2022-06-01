@@ -5,7 +5,7 @@ library(shinyjs )
 fillPage(theme = shinytheme("united"),
                 navbarPage(
                   # theme = "cerulean",  # <--- To use a theme, uncomment this
-                  "Sample App",
+                  "Equity Dashboard",
                   tabPanel("Categorical",
                            sidebarPanel(
                              useShinyjs(),
