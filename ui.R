@@ -1,5 +1,6 @@
 library(shiny)
 library(shinythemes)
+library(shinyjs )
 
 fillPage(theme = shinytheme("united"),
                 navbarPage(
