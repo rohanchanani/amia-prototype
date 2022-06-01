@@ -12,11 +12,11 @@ fillPage(theme = shinytheme("united"),
                              HTML("<h3>Input parameters</h3>"),
                              
                              selectInput("categorical1", label = "First Strata:", 
-                                         choices = list("Section" = "section", "Company" = "company_name", "Type" = "type"), 
+                                         choices = list("Section" = "Section", "Company" = "Company", "Type" = "Type"), 
                                          selected = "Section"),
                              
                              selectInput("categorical2", label = "Second Strata:", 
-                                         choices = list("Type" = "type", "Company" = "company_name", "Section" = "section"), 
+                                         choices = list("Type" = "Type", "Company" = "Company", "Section" = "Section"), 
                                          selected = "Type"),
                              
                              selectInput("catDisplay", label="Display:", choices=list("Actual"="categoricalValueTable", "Expected"="categoricalExpectedTable","Difference"="categoricalDifferenceTable","Graph"="categoricalBarGraph"), selected="Graph")
@@ -34,11 +34,11 @@ fillPage(theme = shinytheme("united"),
                              HTML("<h3>Input parameters</h3>"),
                              
                              selectInput("numeric1", label = "First Strata:", 
-                                         choices = list("Section" = "section", "Company" = "company_name", "Type" = "type"), 
+                                         choices = list("Section" = "Section", "Company" = "Company", "Type" = "Type"), 
                                          selected = "Section"),
                              
                              selectInput("numeric2", label = "Second Strata:", 
-                                         choices = list("Type" = "type", "Company" = "company_name", "Section" = "section"), 
+                                         choices = list("Type" = "Type", "Company" = "Company", "Section" = "Section"), 
                                          selected = "Type"),
                              
                              textInput("character", "Character to Count (optional):",""),

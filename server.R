@@ -10,6 +10,8 @@ library(shinyjs)
 
 questions_df <- read_csv("https://raw.githubusercontent.com/rohanchanani/ApprenticeshipKMS/main/questions.csv")
 
+questions_df <- questions_df %>% mutate(Company=company_name, Section=section)
+
 oneClassify <- function(length) {
   if(length < 150) {
     return("short")
@@ -34,8 +36,8 @@ calcMean <- function(array) {
 
 createCategorical <- function(strata1, strata2) {
   
-  if(strata1 == 'type' | strata2 == 'type') {
-    questions_df <- questions_df %>% mutate(type=classify(nchar(question)+nchar(answer)))
+  if(strata1 == 'Type' | strata2 == 'Type') {
+    questions_df <- questions_df %>% mutate(Type=classify(nchar(question)+nchar(answer)))
   }
   values1 <- questions_df %>% distinct(!!as.symbol(strata1)) %>% pull(!!as.symbol(strata1))
   outputTable <- data.frame(values1)
@@ -55,15 +57,15 @@ createCategorical <- function(strata1, strata2) {
 createNumeric <- function(strata1, strata2, character='') {
   character <- substr(character, 1, 1)
   
-  if(strata1 == 'type' | strata2=='type') {
-    questions_df <- questions_df %>% mutate(type=classify(nchar(question)+nchar(answer)))
+  if(strata1 == 'Type' | strata2=='Type') {
+    questions_df <- questions_df %>% mutate(Type=classify(nchar(question)+nchar(answer)))
   }
   if (character == '') {
-    questions_df <- questions_df %>% mutate(length=nchar(question)+nchar(answer))
-    metric <- 'length'
+    questions_df <- questions_df %>% mutate(Length=nchar(question)+nchar(answer))
+    metric <- 'Length'
   } else {
-    questions_df <- questions_df %>% mutate(occurences=str_count(paste(question, answer, sep=""), character))
-    metric <- 'occurences'
+    questions_df <- questions_df %>% mutate(Occurences=str_count(paste(question, answer, sep=""), character))
+    metric <- 'Occurences'
   }
   values1 <- questions_df %>% distinct(!!as.symbol(strata1)) %>% pull(!!as.symbol(strata1))
   outputTable <- data.frame(values1)
