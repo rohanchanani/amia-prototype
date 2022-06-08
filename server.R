@@ -3,6 +3,8 @@ library(readr)
 library(stringr)
 library(ggplot2)
 library(tools)
+library(Dict)
+library(labelled)
 library(shiny)
 library(shinythemes)
 library(shinyjs)
@@ -10,22 +12,43 @@ library(shinyjs)
 
 questions_df <- read_csv("https://raw.githubusercontent.com/rohanchanani/ApprenticeshipKMS/main/questions.csv")
 
-questions_df <- questions_df %>% mutate(Company=company_name, Section=section)
-
-oneClassify <- function(length) {
-  if(length < 150) {
-    return("short")
+companies <- questions_df %>% distinct(company_name) %>% pull(company_name)
+company_replacements <- c("30305", "30306", "30307", "30308", "30309")
+sections <- questions_df %>% distinct(section) %>% pull(section)
+section_replacements <- c("Asthma", "Sickle Cell", "Cystic Fibrosis", "Hemophilia", "Myocarditis", "Kawasaki disease", "Leukemia")
+replace_company <- function(company) {
+  return(company_replacements[match(company, companies)])
+}
+replace_section <- function(section) {
+  return(section_replacements[match(section, sections)])
+}
+full_section <- function(section) {
+  return(sapply(section, replace_section))
+}
+full_company <- function(company) {
+  return(sapply(company, replace_company))
+}
+rand_admit <- function(test) {
+  random <- as.numeric(sample(0:1, 1))
+  if (random == 0) {
+    return(0)
+  } else {
+    return(1)
   }
-  if(length<350) {
-    return("medium")
-  }
-  return("long")
 }
 
+oneClassify <- function(length) {
+  if(length < 250) {
+    return("Medicaid")
+  }
+  if(length<400) {
+    return("Private")
+  }
+  return("Self-Pay")
+}
 classify <- function(column) {
   sapply(column, oneClassify)
 }
-
 calcMean <- function(array) {
   if (length(array) != 0) {
     return(mean(array))
@@ -34,47 +57,21 @@ calcMean <- function(array) {
   }
 }
 
-createCategorical <- function(strata1, strata2) {
-  
-  if(strata1 == 'Type' | strata2 == 'Type') {
-    questions_df <- questions_df %>% mutate(Type=classify(nchar(question)+nchar(answer)))
-  }
-  values1 <- questions_df %>% distinct(!!as.symbol(strata1)) %>% pull(!!as.symbol(strata1))
-  outputTable <- data.frame(values1)
-  names(outputTable)[1] <- strata1
-  values2 <- questions_df %>% distinct(!!as.symbol(strata2)) %>% pull(!!as.symbol(strata2))
-  for (col in 1:length(values2)) {
-    newCol <- c()
-    for (row in 1:length(values1)) {
-      currentVal <- questions_df %>% filter(!!as.symbol(strata1)==values1[row], !!as.symbol(strata2)==values2[col]) %>% nrow()
-      newCol[row] <- currentVal
-    }
-    outputTable[values2[col]] <- newCol
-  }
-  return(outputTable)
-}
+questions_df <- questions_df %>% mutate(Disease=full_section(section), "Zip Code"=full_company(company_name), Insurance=classify(nchar(question)+nchar(answer)), "Length of Stay"=nchar(question)+nchar(answer), Readmissions=lapply(question, rand_admit)) %>% subset(select=-c(section, company_id, company_name, version, question_id, number))
 
-createNumeric <- function(strata1, strata2, character='') {
-  character <- substr(character, 1, 1)
-  
-  if(strata1 == 'Type' | strata2=='Type') {
-    questions_df <- questions_df %>% mutate(Type=classify(nchar(question)+nchar(answer)))
-  }
-  if (character == '') {
-    questions_df <- questions_df %>% mutate(Length=nchar(question)+nchar(answer))
-    metric <- 'Length'
-  } else {
-    questions_df <- questions_df %>% mutate(Occurences=str_count(paste(question, answer, sep=""), character))
-    metric <- 'Occurences'
-  }
-  values1 <- questions_df %>% distinct(!!as.symbol(strata1)) %>% pull(!!as.symbol(strata1))
+createTable <- function(dimension, determinant, metric, isNumeric) {
+  values1 <- questions_df %>% distinct(!!as.symbol(dimension)) %>% pull(!!as.symbol(dimension)) %>% remove_attributes("names")
   outputTable <- data.frame(values1)
-  names(outputTable)[1] <- strata1
-  values2 <- questions_df %>% distinct(!!as.symbol(strata2)) %>% pull(!!as.symbol(strata2))
+  names(outputTable)[1] <- dimension
+  values2 <- questions_df %>% distinct(!!as.symbol(determinant)) %>% pull(!!as.symbol(determinant)) %>% remove_attributes("names")
   for (col in 1:length(values2)) {
     newCol <- c()
     for (row in 1:length(values1)) {
-      currentVal <- questions_df %>% filter(!!as.symbol(strata1)==values1[row], !!as.symbol(strata2)==values2[col]) %>% pull(!!as.symbol(metric)) %>% calcMean()
+      if (isNumeric) {
+        currentVal <- questions_df %>% filter(!!as.symbol(dimension)==values1[row], !!as.symbol(determinant)==values2[col]) %>% pull(!!as.symbol(metric)) %>% calcMean()
+      } else {
+        currentVal <- questions_df %>% filter(!!as.symbol(dimension)==values1[row], !!as.symbol(determinant)==values2[col], !!as.symbol(metric)==1) %>% nrow()
+      }
       newCol[row] <- currentVal
     }
     outputTable[values2[col]] <- newCol
@@ -92,6 +89,7 @@ createExpected <- function(actualOutput) {
   return(actualOutput)
 }
 
+
 findDifference <- function(outputTable) {
   expected <- createExpected(outputTable)
   for (row in 1:nrow(outputTable)) {
@@ -102,18 +100,9 @@ findDifference <- function(outputTable) {
   return(outputTable)
 }
 
-makeBarGraph <- function(outputTable, strata2, numeric=FALSE, character="") {
-  if (numeric) {
-    if (character == "") {
-      unit <- "(Average Character Length)"
-    } else {
-      character <- paste('"',substr(character, 1, 1), '"', sep="")
-      unit <- paste('(Average Occurences of',character,')')
-    }
-  } else {
-    unit <- "(Number of Questions)"
-  }
-  title <- paste(toTitleCase(strata2), "Discrepancies by", toTitleCase(colnames(outputTable)[1]))
+makeBarGraph <- function(outputTable, determinant, metric) {
+  unit <- paste("(", metric, ")", sep="")
+  title <- paste(toTitleCase(determinant), "Discrepancies by", toTitleCase(colnames(outputTable)[1]))
   differenceTable <- findDifference(outputTable)
   testStrata <- c()
   totalDiscrepancy <- c()
@@ -122,26 +111,21 @@ makeBarGraph <- function(outputTable, strata2, numeric=FALSE, character="") {
     totalDiscrepancy[row] <- sum(abs(differenceTable[row,2:ncol(differenceTable)]))
   }
   finalData <- data.frame(testStrata, totalDiscrepancy)
-  return(ggplot(data=finalData, aes(x=testStrata, y=totalDiscrepancy)) + geom_bar(aes(x=testStrata), stat='identity') + coord_flip() + ggtitle(title) + labs(x=toTitleCase(toTitleCase(colnames(outputTable)[1])), y=paste(toTitleCase(strata2), "Discrepancy", unit)) + theme(aspect.ratio=1))
+  return(ggplot(data=finalData, aes(x=testStrata, y=totalDiscrepancy)) + geom_bar(aes(x=testStrata), stat='identity') + coord_flip() + ggtitle(title) + labs(x=toTitleCase(toTitleCase(colnames(outputTable)[1])), y=paste(toTitleCase(determinant), "Discrepancy", unit)))
 }
 
-ids <- c("categoricalValueTable", "categoricalExpectedTable", "categoricalDifferenceTable", "categoricalBarGraph", "numericValueTable", "numericExpectedTable", "numericDifferenceTable", "numericBarGraph")
+ids <- c("value", "expected", "difference", "graph")
 
 shinyServer(function(input, output, session) {
-    output$categoricalValueTable <- renderDataTable({createCategorical(input$categorical1, input$categorical2)})
-    output$categoricalExpectedTable <- renderDataTable({createExpected(createCategorical(input$categorical1, input$categorical2))})
-    output$categoricalDifferenceTable <- renderDataTable({findDifference(createCategorical(input$categorical1, input$categorical2))})
-    output$categoricalBarGraph <- renderPlot({makeBarGraph(createCategorical(input$categorical1, input$categorical2), input$categorical2)})
-    
-    output$numericValueTable <- renderDataTable({createNumeric(input$numeric1, input$numeric2, input$character)})
-    output$numericExpectedTable <- renderDataTable({createExpected(createNumeric(input$numeric1, input$numeric2, input$character))})
-    output$numericDifferenceTable <- renderDataTable({findDifference(createNumeric(input$numeric1, input$numeric2, input$character))})
-    output$numericBarGraph <- renderPlot({makeBarGraph(createNumeric(input$numeric1, input$numeric2, input$character), input$numeric2, TRUE, input$character)})
+    output$value <- renderDataTable({createTable(input$dimension, input$determinant, input$outcome, input$outcome=="Length of Stay")})
+    output$expected <- renderDataTable({createExpected(createTable(input$dimension, input$determinant, input$outcome, input$outcome=="Length of Stay"))})
+    output$difference <- renderDataTable({findDifference(createTable(input$dimension, input$determinant, input$outcome, input$outcome=="Length of Stay"))})
+    output$graph <- renderPlot({makeBarGraph(createTable(input$dimension, input$determinant, input$outcome, input$outcome=="Length of Stay"), input$determinant, input$outcome)})
     
     
     observe({
       for (test in 1:length(ids)) {
-        if (input$catDisplay == ids[test] | input$numDisplay == ids[test]) {
+        if (input$display == ids[test]) {
           show(ids[test])
         } else {
           hide(ids[test])
