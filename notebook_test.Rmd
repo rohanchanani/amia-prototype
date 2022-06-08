@@ -13,21 +13,47 @@ library(readr)
 library(stringr)
 library(ggplot2)
 library(tools)
+library(Dict)
+library(labelled)
 questions_df <- read_csv("https://raw.githubusercontent.com/rohanchanani/ApprenticeshipKMS/main/questions.csv")
-new <- questions_df %>% group_by(company_name,section) %>% summarize(count=n()) 
-numsections <- questions_df %>% distinct(section) %>% nrow()
-numsections
+```
+
+```{r}
+companies <- questions_df %>% distinct(company_name) %>% pull(company_name)
+company_replacements <- c("30305", "30306", "30307", "30308", "30309")
+sections <- questions_df %>% distinct(section) %>% pull(section)
+section_replacements <- c("Asthma", "Sickle Cell", "Cystic Fibrosis", "Hemophilia", "Myocarditis", "Kawasaki disease", "Leukemia")
+replace_company <- function(company) {
+  return(company_replacements[match(company, companies)])
+}
+replace_section <- function(section) {
+  return(section_replacements[match(section, sections)])
+}
+full_section <- function(section) {
+  return(sapply(section, replace_section))
+}
+full_company <- function(company) {
+  return(sapply(company, replace_company))
+}
+rand_admit <- function(test) {
+  random <- as.numeric(sample(0:1, 1))
+  if (random == 0) {
+    return(0)
+  } else {
+    return(1)
+  }
+}
 ```
 
 ```{r}
 oneClassify <- function(length) {
-  if(length < 150) {
-    return("short")
+  if(length < 250) {
+    return("Medicaid")
   }
-  if(length<350) {
-    return("medium")
+  if(length<400) {
+    return("Private")
   }
-  return("long")
+  return("Self-Pay")
 }
 classify <- function(column) {
   sapply(column, oneClassify)
@@ -42,64 +68,34 @@ calcMean <- function(array) {
 ```
 
 ```{r}
-createCategorical <- function(strata1, strata2) {
+questions_df <- questions_df %>% mutate(Disease=full_section(section), "Zip Code"=full_company(company_name), Insurance=classify(nchar(question)+nchar(answer)), "Length of Stay"=nchar(question)+nchar(answer), Readmissions=lapply(question, rand_admit)) %>% subset(select=-c(section, company_id, company_name, version, question_id, number))
+```
 
-  if(strata1 == 'type' | strata2 == 'type') {
-  questions_df <- questions_df %>% mutate(type=classify(nchar(question)+nchar(answer)))
-  }
-  values1 <- questions_df %>% distinct(!!as.symbol(strata1)) %>% pull(!!as.symbol(strata1))
+```{r}
+createTable <- function(dimension, determinant, metric, isNumeric) {
+  values1 <- questions_df %>% distinct(!!as.symbol(dimension)) %>% pull(!!as.symbol(dimension)) %>% remove_attributes("names")
   outputTable <- data.frame(values1)
-  names(outputTable)[1] <- strata1
-  values2 <- questions_df %>% distinct(!!as.symbol(strata2)) %>% pull(!!as.symbol(strata2))
+  names(outputTable)[1] <- dimension
+  values2 <- questions_df %>% distinct(!!as.symbol(determinant)) %>% pull(!!as.symbol(determinant)) %>% remove_attributes("names")
   for (col in 1:length(values2)) {
     newCol <- c()
     for (row in 1:length(values1)) {
-      currentVal <- questions_df %>% filter(!!as.symbol(strata1)==values1[row], !!as.symbol(strata2)==values2[col]) %>% nrow()
+      if (isNumeric) {
+        currentVal <- questions_df %>% filter(!!as.symbol(dimension)==values1[row], !!as.symbol(determinant)==values2[col]) %>% pull(!!as.symbol(metric)) %>% calcMean()
+      } else {
+        currentVal <- questions_df %>% filter(!!as.symbol(dimension)==values1[row], !!as.symbol(determinant)==values2[col], !!as.symbol(metric)==1) %>% nrow()
+      }
       newCol[row] <- currentVal
     }
     outputTable[values2[col]] <- newCol
   }
   return(outputTable)
 }
+makeBarGraph(createTable("Disease", "Insurance", "Readmissions", FALSE), "Insurance", "Readmissions")
 ```
-```{r}
-createNumeric <- function(strata1, strata2, character='') {
-  character <- substr(character, 1, 1)
 
-  if(strata1 == 'type' | strata2=='type') {
-  questions_df <- questions_df %>% mutate(type=classify(nchar(question)+nchar(answer)))
-  }
-  if (character == '') {
-    questions_df <- questions_df %>% mutate(length=nchar(question)+nchar(answer))
-    metric <- 'length'
-  } else {
-    questions_df <- questions_df %>% mutate(occurences=str_count(paste(question, answer, sep=""), character))
-    metric <- 'occurences'
-  }
-  values1 <- questions_df %>% distinct(!!as.symbol(strata1)) %>% pull(!!as.symbol(strata1))
-  outputTable <- data.frame(values1)
-  names(outputTable)[1] <- strata1
-  values2 <- questions_df %>% distinct(!!as.symbol(strata2)) %>% pull(!!as.symbol(strata2))
-  for (col in 1:length(values2)) {
-    newCol <- c()
-    for (row in 1:length(values1)) {
-      currentVal <- questions_df %>% filter(!!as.symbol(strata1)==values1[row], !!as.symbol(strata2)==values2[col]) %>% pull(!!as.symbol(metric)) %>% calcMean()
-      newCol[row] <- currentVal
-    }
-    outputTable[values2[col]] <- newCol
-  }
-  return(outputTable)
-}
-```
-```{r}
-createNumeric("section", "type")
-```
  
-```{r}
-createExpectedNumeric <- function(numericOutput) {
-  
-}
-```
+
 ```{r}
 createExpected <- function(actualOutput) {
   for (row in 1:nrow(actualOutput)) {
@@ -110,9 +106,6 @@ createExpected <- function(actualOutput) {
   }
   return(actualOutput)
 }
-head(createNumeric("section", "type"))
-head(createExpected(createNumeric("section", "type")))
-head(findDifference(createNumeric("section", "type")))
 ```
 ```{r}
 findDifference <- function(outputTable) {
@@ -127,18 +120,9 @@ findDifference <- function(outputTable) {
 ```
 
 ```{r}
-makeBarGraph <- function(outputTable, strata2, numeric=FALSE, character="") {
-  if (numeric) {
-    if (character == "") {
-      unit <- "(Average Character Length)"
-    } else {
-      character <- paste('"',substr(character, 1, 1), '"', sep="")
-      unit <- paste('(Average Occurences of',character,')')
-    }
-  } else {
-    unit <- "(Number of Questions)"
-  }
-  title <- paste(toTitleCase(strata2), "Discrepancies by", toTitleCase(colnames(outputTable)[1]))
+makeBarGraph <- function(outputTable, determinant, metric) {
+  unit <- paste("(", metric, ")", sep="")
+  title <- paste(toTitleCase(determinant), "Discrepancies by", toTitleCase(colnames(outputTable)[1]))
   differenceTable <- findDifference(outputTable)
   testStrata <- c()
   totalDiscrepancy <- c()
@@ -147,13 +131,8 @@ makeBarGraph <- function(outputTable, strata2, numeric=FALSE, character="") {
     totalDiscrepancy[row] <- sum(abs(differenceTable[row,2:ncol(differenceTable)]))
   }
   finalData <- data.frame(testStrata, totalDiscrepancy)
-  return(ggplot(data=finalData, aes(x=testStrata, y=totalDiscrepancy)) + geom_bar(aes(x=testStrata), stat='identity') + coord_flip() + ggtitle(title) + labs(x=toTitleCase(toTitleCase(colnames(outputTable)[1])), y=paste(toTitleCase(strata2), "Discrepancy", unit)))
+  return(ggplot(data=finalData, aes(x=testStrata, y=totalDiscrepancy)) + geom_bar(aes(x=testStrata), stat='identity') + coord_flip() + ggtitle(title) + labs(x=toTitleCase(toTitleCase(colnames(outputTable)[1])), y=paste(toTitleCase(determinant), "Discrepancy", unit)))
 }
-makeBarGraph(createNumeric("section", "type", 'a'), "type", TRUE, 'a')
-```
-```{r}
-test <- "hello"
-substr("h", 1, 1)
 ```
 
 
