@@ -7,25 +7,39 @@ fillPage(theme = shinytheme("united"),
                   headerPanel("Equity Dashboard"),
                   sidebarPanel(
                              useShinyjs(),
-                             HTML("<h3>Input parameters</h3>"),
+                             HTML("<h5 style='font-weight:bold;'>My population of interest is:</h5>"),
                              
-                             selectInput("dimension", label = "Dimension:", 
-                                         choices = list("Disease"="Disease", "Zip Code"="Zip Code"), selected="Zip Code"),
+                             selectInput("Setting", label = "Setting:", 
+                                         choices = c()),
                              
-                             selectInput("determinant", label = "Social Determinant of Health:", 
-                                         choices = list("Insurance"="Insurance"), 
+                             selectInput("Campus", label = "Campus:", 
+                                         choices = c()),
+                             
+                             selectInput("Outcome", label = "My outcome of interest is:", 
+                                         choices = c("Readmissions", "Length of Stay"), selected="Readmissions"),
+                             
+                             selectInput("Determinant", label = "I want to look for disparities by:", 
+                                         choices = c("Insurance"), 
                                          selected = "Insurance"),
                              
-                             selectInput("outcome", label = "Outcome Metric:", 
-                                         choices = list("Readmissions"="Readmissions", "Length of Stay"="Length of Stay"), 
-                                         selected = "Readmissions"),
+                             selectInput("Target", label="The group I worry may be disadvantaged is:", choices=c()),
                              
-                             selectInput("display", label="Display:", choices=list("Graph"="graph", "Actual"="value", "Expected"="expected","Difference"="difference"), selected="Graph")
+                             HTML("<h5 id='heading' style='font-weight:bold;'>Refine by Sub-Populations:</h5>", ),
+                             
+                             tags$div(id = "inline", selectInput("Dimension", label = "Which",choices = c("", "Zip Code", "Disease"), selected="")),
+                             
+                             HTML(paste("<label for='Dimension' id='DimLabel'>",textOutput("Question"),"</label>", sep="")),
+                             
+                             selectInput("Display", label="Display:", choices=list("Graph"="Graph", "Full Graph"="GroupedGraph", "Actual (Average)"="ActualAvg", "Actual (Total)"="ActualTot", "Expected"="Expected", "Difference"="Difference"), selected="Graph")
+         
                            ), # sidebarPanel
                            mainPanel(
-                             dataTableOutput("value"),
-                             dataTableOutput("expected"),
-                             dataTableOutput("difference"),
-                             plotOutput("graph", width="80%")
+                             dataTableOutput("ActualAvg"),
+                             dataTableOutput("ActualTot"),
+                             dataTableOutput("Expected"),
+                             dataTableOutput("Difference"),
+                             plotOutput("DiagnosticGraph", width="80%"),
+                             plotOutput("GroupedGraph", width="80%"),
+                             plotOutput("Graph", width="80%")
                            ) # mainPanel
           )
