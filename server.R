@@ -13,7 +13,7 @@ library(shinyjs)
 
 questions_df <- read_csv("https://raw.githubusercontent.com/rohanchanani/ApprenticeshipKMS/main/questions.csv")
 specifications <- c("Setting", "Campus")
-
+units = c("Length of Stay"="Hours", "Readmissions"="Occurences")
 companies <- questions_df %>% distinct(company_name) %>% pull(company_name)
 company_replacements <- c("30305", "30306", "30307", "30308", "30309")
 sections <- questions_df %>% distinct(section) %>% pull(section)
@@ -76,7 +76,8 @@ diagnosticGraph <- function(determinant, metric, setting, campus) {
     metricValues[row] <- usableData %>% filter(!!as.symbol(determinant)==determinantPossibilities[row]) %>% pull(!!as.symbol(metric)) %>% calcMean()
   }
   graphTable['metric'] <- metricValues
-  return(ggplot(data=graphTable, aes(x=determinant, y=metric)) + geom_bar(aes(x=determinant), stat='identity') + coord_flip() + ggtitle(toTitleCase(paste(metric, "by", determinant))) + labs(x=toTitleCase(determinant), y=toTitleCase(metric)))
+  nudge = metricValues %>% sapply(abs) %>% mean() / 15
+  return(ggplot(data=graphTable, aes(x=determinant, y=metric)) + geom_bar(aes(x=determinant), stat='identity') + geom_text(aes(y=metric+nudge*sign(metric), label = signif(metric, digits=2))) + coord_flip() + ggtitle(toTitleCase(paste(metric, "by", determinant))) + labs(x=toTitleCase(determinant), y=toTitleCase(paste("Average",metric,paste("(",units[metric],")",sep="")))))
 }
 
 createTables <- function(dimension, determinant, metric, setting, campus) {
@@ -93,6 +94,7 @@ createTables <- function(dimension, determinant, metric, setting, campus) {
   outputExpected <- outputTable
   outputDifference <- outputTable
   outputTotal <- outputTable
+  outputAbsolute <- outputTable
   values2 <- targetData %>% distinct(!!as.symbol(determinant)) %>% pull(!!as.symbol(determinant)) %>% remove_attributes("names")
   for (col in 1:length(values2)) {
     newCol <- c()
@@ -101,8 +103,8 @@ createTables <- function(dimension, determinant, metric, setting, campus) {
     newDifference <- c()
     for (row in 1:length(values1)) {
       metricVector <- targetData %>% filter(!!as.symbol(dimension)==values1[row], !!as.symbol(determinant)==values2[col]) %>% pull(!!as.symbol(metric))
-      newCol[row] <- metricVector %>% calcMean()
       totals[row] <- metricVector %>% sum()
+      newCol[row] <- metricVector %>% calcMean()
       expectedRate <- targetData %>% filter(!!as.symbol(dimension)==values1[row]) %>% pull(!!as.symbol(metric)) %>% calcMean()
       newExpected[row] <- expectedRate * length(metricVector)
       newDifference[row] <- totals[row] - newExpected[row]
@@ -123,60 +125,153 @@ groupedBar <- function(dimension, determinant, metric, setting, campus) {
   names(graphData)[3] <- metric
   dims <- rawData %>% pull(!!as.symbol(dimension))
   dets <- rawData %>% colnames()
+  dimsList <- c()
+  detsList <- c()
+  for (dim in 1:length(dims)) {
+    dimsList[dims[dim]] <- dim
+  }
+  for (det in 1:length(dets)) {
+    detsList[dets[det]] <- det
+  }
   counter = 1
+  allVals <- c()
   for (row in 1:nrow(rawData)) {
     for (col in 2:ncol(rawData)) {
       graphData[counter,] <- list(dims[row], dets[col], rawData[row,col])
+      allVals[counter] <- rawData[row,col]
       counter = counter+1
     }
   }
-  title <- toTitleCase(paste("Actual - Expected",metric,"by",determinant))
-  return(ggplot(graphData, aes(fill=!!as.symbol(determinant), y=!!as.symbol(metric), x=!!as.symbol(dimension))) + 
-           geom_bar(position="dodge", stat="identity") + coord_flip() + ggtitle(title))
+  title <- toTitleCase(paste("Discrepancy in",metric,"by",determinant,"and",dimension))
+  yLabel1 <- toTitleCase(paste("Actual - Equitable*",metric,"in",units[metric],"(Total cumulative",units[metric],"across all visits in each",paste(dimension,")",sep="")))
+  yLabel2 <- paste("*In an equitable system, we would expect the average",metric,"to be the same across",paste(determinant,".",sep=""),"The graph above shows the difference between the actual cumulative",metric, "and the equitable cumulative",metric,"for all visits in each",paste(dimension,".",sep=""),"In a perfectly equitable",paste(dimension,",",sep=""),"each of the bars would be at 0.")
+  textX = 1.5 + rawData %>% pull(!!as.symbol(dimension)) %>% length()
+  textY1 = min(allVals) + (max(allVals) - min(allVals)) * 0.2
+  textY2 = min(allVals) + (max(allVals) - min(allVals)) * 0.8
+  arrowOffset = (max(allVals) - min(allVals)) / 16
+  arrowLength = (max(allVals) - min(allVals)) * 3 / 8
+  minText = paste("Lower cumulative", metric, "relative to whole population")
+  maxText = paste("Higher cumulative", metric, "relative to whole population")
+  meanY=(max(allVals) + min(allVals)) / 2
+  arrowX = textX - 0.5
+  nudge = allVals %>% sapply(abs) %>% mean() / 8
+  mini_nudge = nudge / 2
+  return(ggplot(graphData, aes(fill=!!as.symbol(determinant), y=!!as.symbol(metric), x=!!as.symbol(dimension)))
+         + geom_bar(position=position_dodge(0.75), width=0.75, stat="identity")
+         + annotate("text", x=textX+0.5, y=textY1, label="")
+         + annotate("text", x=textX, y=textY1, label=str_wrap(minText, width=60))
+         + annotate("text", x=textX, y=textY2, label=str_wrap(maxText, width=60))
+         + geom_segment(aes(x=arrowX,y=meanY+arrowOffset,xend=arrowX,yend=meanY+arrowOffset+arrowLength),arrow=arrow())
+         + geom_segment(aes(x=arrowX,y=meanY-arrowOffset,xend=arrowX,yend=meanY-arrowOffset-arrowLength),arrow=arrow())
+         + coord_flip(clip="off")
+         + geom_text(position=position_dodge(width=0.75),aes(y=!!as.symbol(metric)+sign(!!as.symbol(metric))*nudge - mini_nudge,fill=!!as.symbol(determinant),label=signif(!!as.symbol(metric), digits=2),hjust=0))
+         + ggtitle(title)
+         + labs(x=dimension, y=paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
 }
 
-isolatedBar <- function(dimension, determinant, metric, setting, campus, target) {
-  rawData <- data.frame(createTables(dimension, determinant, metric, setting, campus)[4], check.names = FALSE)
-  title <- toTitleCase(paste("Actual - Predicted",metric,"for patients with",determinant,"of",target))
-  return(ggplot(data=rawData, aes(x=!!as.symbol(dimension), y=!!as.symbol(target))) + geom_bar(stat="identity") + coord_flip() + ggtitle(title) + labs(x=dimension, y=metric))
+isolatedBar <- function(dimension, determinant, metric, setting, campus, target, index=4) {
+  rawData <- data.frame(createTables(dimension, determinant, metric, setting, campus)[index], check.names = FALSE)
+  title <- toTitleCase(paste("Discrepancy in",metric,"for patients with",determinant,"of",target,"by",dimension))
+  yLabel1 <- toTitleCase(paste("Actual - Equitable*",metric,"in",units[metric],"(Total cumulative",units[metric],"across all",target,"visits in each",paste(dimension,")",sep="")))
+  yLabel2 <- paste("*In an equitable system, we would expect the average",metric,"to be the same across",paste(determinant,".",sep=""),"The graph above shows the difference between the actual cumulative",metric, "for",target,"visits and the equitable cumulative",metric, "for each",paste(dimension,".",sep=""),"In a perfectly equitable",paste(dimension,",",sep=""),"the bar would be at 0.")
+  textX = 1.5 + rawData %>% pull(!!as.symbol(dimension)) %>% length()
+  targetValues = rawData %>% pull(!!as.symbol(target))
+  textY1 = min(targetValues) + (max(targetValues) - min(targetValues)) * 0.2
+  textY2 = min(targetValues) + (max(targetValues) - min(targetValues)) * 0.8
+  arrowOffset = (max(targetValues) - min(targetValues)) / 16
+  arrowLength = (max(targetValues) - min(targetValues)) * 3 / 8
+  minText = paste("Lower cumulative", metric, "in", target, "visits relative to whole population")
+  maxText = paste("Higher cumulative", metric, "in", target, "visits relative to whole population")
+  meanY=(max(targetValues) + min(targetValues)) / 2
+  arrowX = textX - 0.5
+  nudge = targetValues %>% sapply(abs) %>% mean() / 15
+  return(ggplot(data=rawData, aes(x=!!as.symbol(dimension), y=!!as.symbol(target)))
+         + geom_bar(stat="identity") + annotate("text", x=textX+0.25, y=0, label="") 
+         + annotate("text", x=textX+0.5, y=textY1, label="")
+         + annotate("text", x=textX, y=textY1, label=str_wrap(minText, width=60))
+         + annotate("text", x=textX, y=textY2, label=str_wrap(maxText, width=60))
+         + geom_segment(aes(x=arrowX,y=meanY+arrowOffset,xend=arrowX,yend=meanY+arrowOffset+arrowLength),arrow=arrow())
+         + geom_segment(aes(x=arrowX,y=meanY-arrowOffset,xend=arrowX,yend=meanY-arrowOffset-arrowLength),arrow=arrow())
+         + coord_flip(clip="off")
+         + geom_text(aes(y=!!as.symbol(target) + nudge*sign(!!as.symbol(target)),label = signif(!!as.symbol(target), digits=2)))
+         + ggtitle(title)
+         + labs(x=dimension, y=paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
 }
 
 ids <- c("ActualAvg", "ActualTot", "Expected", "Difference", "Graph", "GroupedGraph")
-
+macro=TRUE
 shinyServer(function(input, output, session) {
+    hide("Target")
+    hide("Dimension")
+    hide("Question")
+    hide("DimLabel")
+    hide("heading")
+    hide("macroView")
     for (speci in 1:length(specifications)) {
       specVals <- questions_df %>% distinct(!!as.symbol(specifications[speci])) %>% pull(!!as.symbol(specifications[speci])) %>% remove_attributes("names")
       updateSelectInput(session, specifications[speci], choices = c("All", specVals), selected="All")
     }
     initialPossibilities <- questions_df %>% distinct(Insurance) %>% pull(Insurance) %>% remove_attributes("names")
-    updateSelectInput(session, "Target", choices =c("Show All", initialPossibilities), selected="Show All")
+    updateSelectInput(session, "Target", choices =initialPossibilities, selected=initialPossibilities[0])
     observeEvent(input$Determinant, {
       targetPossibilities <- eventReactive(input$Determinant, {questions_df %>% distinct(!!as.symbol(input$Determinant)) %>% pull(!!as.symbol(input$Determinant)) %>% remove_attributes("names")})
-      updateSelectInput(session, "Target", choices =c("Show All", targetPossibilities()), selected=input$Target)
+      updateSelectInput(session, "Target", choices =targetPossibilities(), selected=targetPossibilities()[0])
     })
     output$DiagnosticGraph <- renderPlot({diagnosticGraph(input$Determinant, input$Outcome, input$Setting, input$Campus)})
-    
-    observe({
-      if (input$Target=="Show All") {
-        hide("Dimension")
-        hide("Question")
-        hide("DimLabel")
-        hide("heading")
-        updateSelectInput(session, "Dimension", choices = c("", "Zip Code", "Disease"), selected="")
-      } else {
+    observeEvent(input$diveDeeper, {
+      show("Target")
+      if (input$Target!=""){
         show("Dimension")
-        show("heading")
-        show("DimLabel")
-        output$Question <- renderText({paste("contributes most to the disparity in ",input$Outcome," for patients with ",input$Determinant," of ",input$Target,"?",sep="")})
         show("Question")
+        show("DimLabel")
+        show("heading")
       }
-      if (input$Dimension=="") {
+      hide("diveDeeper")
+      show("macroView")
+      macro=FALSE
+      updateSelectInput(session, "Target", selected="")
+      updateSelectInput(session, "Dimension", choices = c("", "Zip Code", "Disease"), selected="")
+    })
+    observeEvent(input$macroView, {
+      updateSelectInput(session, "Target", selected="")
+      hide("Target")
+      hide("Dimension")
+      hide("Question")
+      hide("DimLabel")
+      hide("heading")
+      show("diveDeeper")
+      hide("macroView")
+      macro=TRUE
+      updateSelectInput(session, "Target", selected="")
+      updateSelectInput(session, "Dimension", choices = c("", "Zip Code", "Disease"), selected="")
+    })
+    observeEvent(input$Target, {
+      if (input$Target!="") {
+        show("Dimension")
+        show("Question")
+        show("DimLabel")
+        show("heading")
+      }
+    })
+    observe({
+      output$Question <- renderText({paste("contributes most to the disparity in ",input$Outcome," for patients with ",input$Determinant," of ",input$Target,"?",sep="")})
+      if (input$Dimension=="" | input$Target=="") {
+        if (input$Target=="") {
+          hide("Dimension")
+          hide("Question")
+          hide("DimLabel")
+          hide("heading")
+        } 
         show("DiagnosticGraph")
         hide("Display")
         for (id in 1:length(ids)) {
           hide(ids[id])
         }
       } else {
+        show("Dimension")
+        show("Question")
+        show("DimLabel")
+        show("heading")
         show("Display")
         hide("DiagnosticGraph")
         outputs <- createTables(input$Dimension, input$Determinant, input$Outcome, input$Setting, input$Campus)
