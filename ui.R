@@ -76,8 +76,8 @@ fillPage(theme = shinytheme("united"),
                                          selected = "Insurance"),
                              tags$head(tags$style(make_css(list('.btn', 'white-space', 'pre-wrap')))),
                              
-                             actionButton("diveDeeper", "After you have found a disparity, dive deeper to look at sub-populations contributing to that disparity", width="100%"),
-                             actionButton("macroView", "View Summary"),
+                             actionButton("diveDeeper", "After you have found a disparity, click here to dive deeper and look at sub-populations contributing to that disparity", width="100%"),
+                             actionButton("macroView", "Click here to view summary statistics"),
                              
                              selectInput("Target", label="The group I worry may be disadvantaged is:", choices=c()),
                              

@@ -13,6 +13,7 @@ library(shinyjs)
 
 questions_df <- read_csv("https://raw.githubusercontent.com/rohanchanani/ApprenticeshipKMS/main/questions.csv")
 specifications <- c("Setting", "Campus")
+averages = c("Length of Stay"="Length of Stay (Hours)", "Readmissions"="Readmission Rate")
 units = c("Length of Stay"="Hours", "Readmissions"="Occurences")
 companies <- questions_df %>% distinct(company_name) %>% pull(company_name)
 company_replacements <- c("30305", "30306", "30307", "30308", "30309")
@@ -77,7 +78,7 @@ diagnosticGraph <- function(determinant, metric, setting, campus) {
   }
   graphTable['metric'] <- metricValues
   nudge = metricValues %>% sapply(abs) %>% mean() / 15
-  return(ggplot(data=graphTable, aes(x=determinant, y=metric)) + geom_bar(aes(x=determinant), stat='identity') + geom_text(aes(y=metric+nudge*sign(metric), label = signif(metric, digits=2))) + coord_flip() + ggtitle(toTitleCase(paste(metric, "by", determinant))) + labs(x=toTitleCase(determinant), y=toTitleCase(paste("Average",metric,paste("(",units[metric],")",sep="")))))
+  return(ggplot(data=graphTable, aes(x=determinant, y=metric)) + geom_bar(aes(x=determinant), stat='identity') + geom_text(aes(y=metric+nudge*sign(metric), label = signif(metric, digits=2))) + coord_flip() + ggtitle(toTitleCase(paste(metric, "by", determinant))) + labs(x=toTitleCase(determinant), y=toTitleCase(paste("Average",averages[metric]))))
 }
 
 createTables <- function(dimension, determinant, metric, setting, campus) {
