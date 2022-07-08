@@ -81,22 +81,24 @@ fillPage(theme = shinytheme("united"),
                              
                              selectInput("Target", label="The group I worry may be disadvantaged is:", choices=c()),
                              
-                             HTML("<h5 id='heading' style='font-weight:bold;'>Refine by Sub-Populations:</h5>", ),
+                             tags$div(id = "inline", selectInput("Dimension", label = "Refine by Sub-Populations:",choices = c("", "Zip Code", "Disease"), selected="")),
                              
-                             tags$div(id = "inline", selectInput("Dimension", label = "Which",choices = c("", "Zip Code", "Disease"), selected="")),
-                             
-                             HTML(paste("<label for='Dimension' id='DimLabel'>",textOutput("Question"),"</label>", sep="")),
-                             
-                             selectInput("Display", label="Display:", choices=list("Graph"="Graph", "Full Graph"="GroupedGraph", "Actual (Average)"="ActualAvg", "Actual (Total)"="ActualTot", "Expected"="Expected", "Difference"="Difference"), selected="Graph")
+                             selectInput("Display", label="Question", choices=c())
          
                            ), # sidebarPanel
                            mainPanel(
+                             plotOutput("DiagnosticGraph", width="80%"),
+                             plotOutput("GroupedGraph", width="80%"),
+                             plotOutput("Graph", width="80%", click="specificClick"),
+                             plotOutput("GroupedActualGraph", width="80%"),
+                             plotOutput("RelativeGraph", click="relativeClick", width="80%"),
+                             dataTableOutput("specificHighlight"),
+                             dataTableOutput("relativeHighlight"),
                              dataTableOutput("ActualAvg"),
                              dataTableOutput("ActualTot"),
                              dataTableOutput("Expected"),
                              dataTableOutput("Difference"),
-                             plotOutput("DiagnosticGraph", width="80%"),
-                             plotOutput("GroupedGraph", width="80%"),
-                             plotOutput("Graph", width="80%")
+                             dataTableOutput("RelativeTable"),
+                             dataTableOutput("SpecificTable"),
                            ) # mainPanel
           )

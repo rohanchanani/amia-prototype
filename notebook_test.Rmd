@@ -59,6 +59,13 @@ rand_insurance <- function(test) {
 ```
 
 ```{r}
+average_units = c("Length of Stay"="Length of Stay (Hours)", "Readmissions"="Readmission Rate")
+absolute_units = c("Length of Stay"="Hours", "Readmissions"="Occurrences")
+specifications <- c("Setting", "Campus")
+```
+
+
+```{r}
 calcMean <- function(array) {
   if (length(array) != 0) {
     return(mean(array))
@@ -79,7 +86,13 @@ questions_df
 
 ```{r}
 diagnosticGraph <- function(determinant, metric, setting, campus) {
-  usableData <- questions_df %>% filter(Setting==setting, Campus==campus)
+  usableData <- questions_df
+  speciValues <- c(setting, campus)
+  for (speci in 1:length(specifications)) {
+    if (speciValues[speci] != "All") {
+      usableData <- usableData %>% filter(!!as.symbol(specifications[speci])==speciValues[speci])
+    }
+  }
   determinantPossibilities <- usableData %>% distinct(!!as.symbol(determinant)) %>% pull(!!as.symbol(determinant)) %>% remove_attributes("names")
   graphTable <- data.frame(determinantPossibilities)
   names(graphTable)[1] <- 'determinant'
@@ -88,11 +101,10 @@ diagnosticGraph <- function(determinant, metric, setting, campus) {
     metricValues[row] <- usableData %>% filter(!!as.symbol(determinant)==determinantPossibilities[row]) %>% pull(!!as.symbol(metric)) %>% calcMean()
   }
   graphTable['metric'] <- metricValues
-  return(ggplot(data=graphTable, aes(x=determinant, y=metric)) + geom_bar(aes(x=determinant), stat='identity') + coord_flip() + ggtitle(toTitleCase(paste(metric, "by", determinant))) + labs(x=toTitleCase(determinant), y=toTitleCase(metric)))
+  nudge = metricValues %>% sapply(abs) %>% mean() / 15
+  return(ggplot(data=graphTable, aes(x=determinant, y=metric)) + geom_bar(aes(x=determinant), stat='identity') + geom_text(aes(y=metric+nudge*sign(metric), label = signif(metric, digits=2))) + coord_flip() + ggtitle(toTitleCase(paste("Average",metric, "by", determinant))) + labs(x=toTitleCase(determinant), y=toTitleCase(paste("Average",average_units[metric]))))
 }
-```
-```{r}
-diagnosticGraph("Insurance", "Readmissions", "ED", "Egleston")
+diagnosticGraph("Insurance", "Length of Stay", "ED", "Egleston")
 ```
 
 
@@ -105,12 +117,14 @@ createTables <- function(dimension, determinant, metric, setting, campus) {
   outputExpected <- outputTable
   outputDifference <- outputTable
   outputTotal <- outputTable
+  outputRelative <- outputTable
   values2 <- questions_df %>% distinct(!!as.symbol(determinant)) %>% pull(!!as.symbol(determinant)) %>% remove_attributes("names")
   for (col in 1:length(values2)) {
     newCol <- c()
     totals <- c()
     newExpected <- c()
     newDifference <- c()
+    newRelative <- c()
     for (row in 1:length(values1)) {
       metricVector <- questions_df %>% filter(!!as.symbol(dimension)==values1[row], !!as.symbol(determinant)==values2[col]) %>% pull(!!as.symbol(metric))
       newCol[row] <- metricVector %>% calcMean()
@@ -118,18 +132,38 @@ createTables <- function(dimension, determinant, metric, setting, campus) {
       expectedRate <- questions_df %>% filter(!!as.symbol(dimension)==values1[row]) %>% pull(!!as.symbol(metric)) %>% calcMean()
       newExpected[row] <- expectedRate * length(metricVector)
       newDifference[row] <- totals[row] - newExpected[row]
+      if (expectedRate == 0) {
+        newRelative[row] <- 0
+      } else {
+        newRelative[row] <- newCol[row] / expectedRate
+      }
     }
     outputTable[values2[col]] <- newCol
     outputExpected[values2[col]] <- newExpected
     outputTotal[values2[col]] <- totals
     outputDifference[values2[col]] <- newDifference
+    outputRelative[values2[col]] <- newRelative
   }
-  return(list(outputTable, outputTotal, outputExpected, outputDifference))
+  return(list(outputTable, outputTotal, outputExpected, outputDifference, outputRelative))
 }
 results <- createTables("Zip Code", "Insurance", "Readmissions", "ED", "Egleston")
 ```
+
 ```{r}
-results[4]
+createSpecific <- function(actual, expected, difference, target) {
+  initialValues <- actual %>% pull(!!as.symbol(names(actual)[1])) %>% remove_attributes("names")
+  output <- data.frame(initialValues)
+  names(output)[1] = names(actual)[1]
+  output["Actual"] = pull(actual, !!as.symbol(target))
+  output["Equitable"] = pull(expected, !!as.symbol(target))
+  output["Difference"] = pull(difference, !!as.symbol(target))
+  return(output[order(output$Difference),])
+}
+```
+
+```{r}
+#createSpecific(data.frame(results[2], check.names=FALSE), data.frame(results[3], check.names=FALSE), data.frame(results[4], check.names=FALSE), "Medicaid")
+data.frame(results[5], check.names=FALSE)
 ```
 
 ```{r}
@@ -141,28 +175,148 @@ groupedBar <- function(dimension, determinant, metric, setting, campus) {
   names(graphData)[3] <- metric
   dims <- rawData %>% pull(!!as.symbol(dimension))
   dets <- rawData %>% colnames()
+  dimsList <- c()
+  detsList <- c()
+  for (dim in 1:length(dims)) {
+    dimsList[dims[dim]] <- dim
+  }
+  for (det in 1:length(dets)) {
+    detsList[dets[det]] <- det
+  }
   counter = 1
+  allVals <- c()
   for (row in 1:nrow(rawData)) {
     for (col in 2:ncol(rawData)) {
       graphData[counter,] <- list(dims[row], dets[col], rawData[row,col])
+      allVals[counter] <- rawData[row,col]
       counter = counter+1
     }
   }
-  title <- toTitleCase(paste("Actual - Expected",metric,"by",determinant))
-  return(ggplot(graphData, aes(fill=!!as.symbol(determinant), y=!!as.symbol(metric), x=!!as.symbol(dimension))) + 
-    geom_bar(position="dodge", stat="identity") + coord_flip() + ggtitle(title))
+  title <- toTitleCase(paste("Discrepancy in total",metric,"by",determinant,"and",dimension))
+  yLabel1 <- toTitleCase(paste("Actual - Equitable*","Total",metric,"in", absolute_units[metric],"(Total cumulative",absolute_units[metric],"across all visits in each",paste(dimension,")",sep="")))
+  yLabel2 <- paste("*In an equitable system, we would expect the average",average_units[metric],"to be the same across",paste(determinant,".",sep=""),"The graph above shows the cumulative difference in",absolute_units[metric], "between the actual",metric, "and the equitable",metric,"for all visits in each",dimension,"by",paste(determinant,".",sep=""),"In a perfectly equitable",paste(dimension,",",sep=""),"each bar would be at 0.")
+  textX = 1.5 + rawData %>% pull(!!as.symbol(dimension)) %>% length()
+  textY1 = min(allVals) + (max(allVals) - min(allVals)) * 0.2
+  textY2 = min(allVals) + (max(allVals) - min(allVals)) * 0.8
+  arrowOffset = (max(allVals) - min(allVals)) / 16
+  arrowLength = (max(allVals) - min(allVals)) * 3 / 8
+  minText = paste("Fewer total", absolute_units[metric], "of",metric,"relative to whole population within the",dimension)
+  maxText = paste("More total", absolute_units[metric], "of",metric,"relative to whole population within the",dimension)
+  meanY=(max(allVals) + min(allVals)) / 2
+  arrowX = textX - 0.5
+  nudge = allVals %>% sapply(abs) %>% mean() / 8
+  mini_nudge = nudge / 2
+  return(ggplot(graphData, aes(fill=!!as.symbol(determinant), y=!!as.symbol(metric), x=!!as.symbol(dimension)))
+         + geom_bar(position=position_dodge(0.75), width=0.75, stat="identity")
+         + annotate("text", x=textX+0.5, y=textY1, label="")
+         + annotate("text", x=textX, y=textY1, label=str_wrap(minText, width=60))
+         + annotate("text", x=textX, y=textY2, label=str_wrap(maxText, width=60))
+         + geom_segment(aes(x=arrowX,y=meanY+arrowOffset,xend=arrowX,yend=meanY+arrowOffset+arrowLength),arrow=arrow())
+         + geom_segment(aes(x=arrowX,y=meanY-arrowOffset,xend=arrowX,yend=meanY-arrowOffset-arrowLength),arrow=arrow())
+         + coord_flip(clip="off")
+         + geom_text(position=position_dodge(width=0.75),aes(y=!!as.symbol(metric)+sign(!!as.symbol(metric))*nudge - mini_nudge,fill=!!as.symbol(determinant),label=signif(!!as.symbol(metric), digits=2),hjust=0))
+         + ggtitle(title)
+         + labs(x=dimension, y=paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
 }
 groupedBar("Zip Code", "Insurance", "Length of Stay", "ED", "Egleston")
 ```
+
 ```{r}
-isolatedBar <- function(dimension, determinant, metric, setting, campus, target) {
-  rawData <- data.frame(createTables(dimension, determinant, metric, setting, campus)[4], check.names = FALSE)
-  title <- toTitleCase(paste("Actual - Predicted",metric,"for patients with",determinant,"of",target))
-  return(ggplot(data=rawData, aes(x=!!as.symbol(dimension), y=!!as.symbol(target))) + geom_bar(stat="identity") + coord_flip() + ggtitle(title))
+groupedActual <- function(dimension, determinant, metric, setting, campus) {
+  rawData <- data.frame(createTables(dimension, determinant, metric, setting, campus)[1], check.names = FALSE)
+  graphData <- data.frame(graphDim=character(), graphDet=character(), graphMet=numeric())
+  names(graphData)[1] <- dimension
+  names(graphData)[2] <- determinant
+  names(graphData)[3] <- metric
+  dims <- rawData %>% pull(!!as.symbol(dimension))
+  dets <- rawData %>% colnames()
+  dimsList <- c()
+  detsList <- c()
+  for (dim in 1:length(dims)) {
+    dimsList[dims[dim]] <- dim
+  }
+  for (det in 1:length(dets)) {
+    detsList[dets[det]] <- det
+  }
+  counter = 1
+  allVals <- c()
+  for (row in 1:nrow(rawData)) {
+    for (col in 2:ncol(rawData)) {
+      graphData[counter,] <- list(dims[row], dets[col], rawData[row,col])
+      allVals[counter] <- rawData[row,col]
+      counter = counter+1
+    }
+  }
+  title <- toTitleCase(paste(metric,"by",dimension,"and",determinant))
+  nudge = allVals %>% sapply(abs) %>% mean() / 8
+  mini_nudge = nudge / 2
+  return(ggplot(graphData, aes(fill=!!as.symbol(determinant), y=!!as.symbol(metric), x=!!as.symbol(dimension)))
+         + geom_bar(position=position_dodge(0.75), width=0.75, stat="identity")
+         + coord_flip(clip="off")
+         + geom_text(position=position_dodge(width=0.75),aes(y=!!as.symbol(metric)+sign(!!as.symbol(metric))*nudge - mini_nudge,fill=!!as.symbol(determinant),label=signif(!!as.symbol(metric), digits=2),hjust=0))
+         + ggtitle(title)
+         + labs(x=dimension, y=paste("Average",average_units[metric])))
+}
+groupedActual("Zip Code", "Insurance", "Length of Stay", "ED", "Egleston")
+```
+
+```{r}
+isolatedBar <- function(dimension, determinant, metric, setting, campus, target, index=4) {
+  initialData <- data.frame(createTables(dimension, determinant, metric, setting, campus)[index], check.names = FALSE)
+  initialValues <- initialData %>% pull(!!as.symbol(names(initialData)[1])) %>% remove_attributes("names")
+  rawData <- data.frame(initialValues)
+  names(rawData)[1] <-  names(initialData)[1]
+  rawData["Difference"] <- initialData %>% pull(!!as.symbol(target)) %>% remove_attributes("names")
+  title <- toTitleCase(paste("Discrepancy in total",metric,"for patients with",determinant,"of",target,"by",dimension))
+  yLabel1 <- toTitleCase(paste("Actual - Equitable*",metric,"in",absolute_units[metric],"(Total cumulative",absolute_units[metric],"across all",target,"visits in each",paste(dimension,")",sep="")))
+  yLabel2 <- paste("*In an equitable system, we would expect the average",average_units[metric],"to be the same across",paste(determinant,".",sep=""),"The graph above shows the cumulative difference in",absolute_units[metric], "between the actual",metric, "and the equitable",metric, "for all",target,"visits in each",paste(dimension,".",sep=""),"In a perfectly equitable",paste(dimension,",",sep=""),"the bar would be at 0.")
+  textX = 1.5 + rawData %>% pull(!!as.symbol(dimension)) %>% length()
+  targetValues = rawData %>% pull(Difference)
+  textY1 = min(targetValues) + (max(targetValues) - min(targetValues)) * 0.2
+  textY2 = min(targetValues) + (max(targetValues) - min(targetValues)) * 0.8
+  arrowOffset = (max(targetValues) - min(targetValues)) / 16
+  arrowLength = (max(targetValues) - min(targetValues)) * 3 / 8
+  minText = paste("Fewer total", absolute_units[metric], "in", target, "visits relative to whole population within the",dimension)
+  maxText = paste("More total", absolute_units[metric], "in", target, "visits relative to whole population within the",dimension)
+  meanY=(max(targetValues) + min(targetValues)) / 2
+  arrowX = textX - 0.5
+  nudge = targetValues %>% sapply(abs) %>% mean() / 15
+  return(ggplot(data=rawData, aes(x=reorder(!!as.symbol(dimension), Difference), y=Difference))
+         + geom_bar(stat="identity") + annotate("text", x=textX+0.25, y=0, label="") 
+         + annotate("text", x=textX+0.5, y=textY1, label="")
+         + annotate("text", x=textX, y=textY1, label=str_wrap(minText, width=60))
+         + annotate("text", x=textX, y=textY2, label=str_wrap(maxText, width=60))
+         + geom_segment(aes(x=arrowX,y=meanY+arrowOffset,xend=arrowX,yend=meanY+arrowOffset+arrowLength),arrow=arrow())
+         + geom_segment(aes(x=arrowX,y=meanY-arrowOffset,xend=arrowX,yend=meanY-arrowOffset-arrowLength),arrow=arrow())
+         + coord_flip(clip="off")
+         + geom_text(aes(y=Difference + nudge*sign(Difference),label = signif(Difference, digits=2)))
+         + ggtitle(title)
+         + labs(x=dimension, y=paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
 }
 isolatedBar("Zip Code", "Insurance", "Length of Stay", "ED", "Egleston", "Medicaid")
 ```
 
+```{r}
+isolatedRelative <- function(dimension, determinant, metric, setting, campus, target, index=5) {
+  initialData <- data.frame(createTables(dimension, determinant, metric, setting, campus)[index], check.names = FALSE)
+  initialValues <- initialData %>% pull(!!as.symbol(names(initialData)[1])) %>% remove_attributes("names")
+  rawData <- data.frame(initialValues)
+  names(rawData)[1] <-  names(initialData)[1]
+  rawData["Ratio"] <- initialData %>% pull(!!as.symbol(target)) %>% remove_attributes("names")
+  title <- toTitleCase(paste("Discrepancy in",metric,"for patients with",determinant,"of",target,"by",dimension))
+  yLabel1 <- toTitleCase(paste("Actual / Equitable*",metric,"across all",target,"visits in each",dimension))
+  yLabel2 <- paste("*In an equitable system, we would expect the average",average_units[metric],"to be the same across",paste(determinant,".",sep=""),"The graph above shows the ratio between the actual average",average_units[metric], "for",target,"visits and the equitable average",average_units[metric], "for each",paste(dimension,".",sep=""),"In a perfectly equitable",paste(dimension,",",sep=""),"the bar would be at 1.")
+  targetValues = rawData %>% pull(Ratio)
+  nudge = targetValues %>% sapply(abs) %>% mean() / 15
+  return(ggplot(data=rawData, aes(x=reorder(!!as.symbol(dimension), Ratio), y=Ratio))
+         + geom_bar(stat="identity")
+         + coord_flip(clip="off")
+         + geom_text(aes(y=Ratio + nudge*sign(Ratio),label = signif(Ratio, digits=2)))
+         + ggtitle(title)
+         + labs(x=dimension, y=paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
+}
+isolatedRelative("Zip Code", "Insurance", "Length of Stay", "ED", "Egleston", "Medicaid")
+```
 
 
 ```{r}
