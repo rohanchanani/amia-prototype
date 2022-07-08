@@ -292,7 +292,7 @@ createHighlight <- function(outputs, index, xVal, dimension, determinant, target
     separator <- " - "
   }
   names(results)[3] <- paste("Expected",metric)
-  names(results)[4] <- paste(paste("Actual","Expected",sep=separator),metric)
+  names(results)[4] <- paste(paste("Actual","Equitable",sep=separator),metric)
   return(results)
 }
 
