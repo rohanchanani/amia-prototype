@@ -291,7 +291,7 @@ createHighlight <- function(outputs, index, xVal, dimension, determinant, target
     results["Difference"] <- c(actualDifference[xVal,target])
     separator <- " - "
   }
-  names(results)[3] <- paste("Expected",metric)
+  names(results)[3] <- paste("Equitable",metric)
   names(results)[4] <- paste(paste("Actual","Equitable",sep=separator),metric)
   return(results)
 }
