@@ -140,6 +140,8 @@ groupedBar <- function(dimension, determinant, metric, setting, campus) {
   dimsList <- c()
   detsList <- c()
   for (dim in 1:length(dims)) {
+    count <- questions_df %>% filter(!!as.symbol(dimension)==dims[dim]) %>% nrow()
+    dims[dim] = paste(dims[dim],paste("n=",count,sep=""),sep="\n")
     dimsList[dims[dim]] <- dim
   }
   for (det in 1:length(dets)) {
@@ -154,16 +156,16 @@ groupedBar <- function(dimension, determinant, metric, setting, campus) {
       counter = counter+1
     }
   }
-  title <- toTitleCase(paste("Discrepancy in Total",absolute_units[metric],"by",determinant,"and",dimension))
-  yLabel1 <- toTitleCase(paste("Actual - Equitable*","Total",absolute_units[metric],"(Total cumulative",absolute_units[metric],"across all visits in each",paste(dimension,")",sep="")))
-  yLabel2 <- paste("*In an equitable system, we would expect the average",average_units[metric],"to be the same across",paste(determinant,".",sep=""),"The graph above shows the difference between the actual cumulative",metric, "and the equitable cumulative",metric,"for all visits in each",paste(dimension,".",sep=""),"In a perfectly equitable",paste(dimension,",",sep=""),"each of the bars would be at 0.")
+  title <- paste("Which",dimension,"contributes most to the disparity in",metric,"across",paste(determinant,"?",sep=""))
+  yLabel1 <- toTitleCase(paste("Actual - Equitable*","Total",absolute_units[metric],"across all visits in each",dimension))
+  yLabel2 <- paste("*In an equitable system, we would expect the average",average_units[metric],"to be the same across",paste(determinant,".",sep=""),"The graph above shows the difference between the actual cumulative",metric, "and the equitable cumulative",metric,"for all visits in each",paste(dimension,".",sep=""),"If the average",average_units[metric],"was equal across", determinant,"for patients with a specific",paste(dimension,",",sep=""), "the bar would be at 0.")
   textX = 1.5 + rawData %>% pull(!!as.symbol(dimension)) %>% length()
   textY1 = min(allVals) + (max(allVals) - min(allVals)) * 0.2
   textY2 = min(allVals) + (max(allVals) - min(allVals)) * 0.8
   arrowOffset = (max(allVals) - min(allVals)) / 16
   arrowLength = (max(allVals) - min(allVals)) * 3 / 8
-  minText = paste("Fewer total", absolute_units[metric], "relative to whole population within the",dimension)
-  maxText = paste("More total", absolute_units[metric], "relative to whole population within the",dimension)
+  minText = paste("Reduced", metric)
+  maxText = paste("Excess", metric)
   meanY=(max(allVals) + min(allVals)) / 2
   arrowX = textX - 0.5
   nudge = allVals %>% sapply(abs) %>% mean() / 8
@@ -192,6 +194,9 @@ groupedActual <- function(dimension, determinant, metric, setting, campus) {
   dimsList <- c()
   detsList <- c()
   for (dim in 1:length(dims)) {
+    print(dims[dim])
+    count <- questions_df %>% filter(!!as.symbol(dimension)==dims[dim]) %>% nrow()
+    dims[dim] = paste(dims[dim],paste("n=",count,sep=""),sep="\n")
     dimsList[dims[dim]] <- dim
   }
   for (det in 1:length(dets)) {
@@ -206,7 +211,7 @@ groupedActual <- function(dimension, determinant, metric, setting, campus) {
       counter = counter+1
     }
   }
-  title <- toTitleCase(paste("Average",average_units[metric],"by",dimension,"and",determinant))
+  title <- paste("I want to look for disparities in",average_units[metric],"within each",dimension,"across",paste(determinant,".",sep=""))
   nudge = allVals %>% sapply(abs) %>% mean() / 8
   mini_nudge = nudge / 2
   return(ggplot(graphData, aes(fill=!!as.symbol(determinant), y=!!as.symbol(metric), x=!!as.symbol(dimension)))
@@ -222,18 +227,22 @@ isolatedBar <- function(dimension, determinant, metric, setting, campus, target,
   initialValues <- initialData %>% pull(!!as.symbol(names(initialData)[1])) %>% remove_attributes("names")
   rawData <- data.frame(initialValues)
   names(rawData)[1] <-  names(initialData)[1]
+  for (dim in 1:nrow(rawData)) {
+    count <- questions_df %>% filter(!!as.symbol(dimension)==rawData[dim,1], !!as.symbol(determinant)==target) %>% nrow()
+    rawData[dim,1] = paste(rawData[dim,1],paste("n=",count,sep=""),sep="\n")
+  }
   rawData["Difference"] <- initialData %>% pull(!!as.symbol(target)) %>% remove_attributes("names")
-  title <- toTitleCase(paste("Discrepancy in total",absolute_units[metric],"for patients with",determinant,"of",target,"by",dimension))
-  yLabel1 <- toTitleCase(paste("Actual - Equitable* total",absolute_units[metric],"Total cumulative",absolute_units[metric],"across all",target,"visits in each",paste(dimension,")",sep="")))
-  yLabel2 <- paste("*In an equitable system, we would expect the average",average_units[metric],"to be the same across",paste(determinant,".",sep=""),"The graph above shows the difference between the actual cumulative",metric, "for",target,"visits and the equitable cumulative",metric, "for each",paste(dimension,".",sep=""),"In a perfectly equitable",paste(dimension,",",sep=""),"the bar would be at 0.")
+  title <- paste("Which",dimension,"should I focus on to improve the disparity in",metric,"by",determinant,"for",target, "patients?")
+  yLabel1 <- toTitleCase(paste("Actual - Equitable* total",absolute_units[metric],"across all",target,"visits in each",dimension))
+  yLabel2 <- paste("*In an equitable system, we would expect the average",average_units[metric],"to be the same across",paste(determinant,".",sep=""),"The graph above shows the difference between the actual cumulative",metric, "for",target,"visits and the equitable cumulative",metric, "for each",paste(dimension,".",sep=""),"If the average",average_units[metric],"was equal across", determinant,"for patients with a specific",paste(dimension,",",sep=""), "the bar would be at 0.")
   textX = 1.5 + rawData %>% pull(!!as.symbol(dimension)) %>% length()
   targetValues = rawData %>% pull(Difference)
   textY1 = min(targetValues) + (max(targetValues) - min(targetValues)) * 0.2
   textY2 = min(targetValues) + (max(targetValues) - min(targetValues)) * 0.8
   arrowOffset = (max(targetValues) - min(targetValues)) / 16
   arrowLength = (max(targetValues) - min(targetValues)) * 3 / 8
-  minText = paste("Fewer total", absolute_units[metric], "in", target, "visits relative to whole population within the",dimension)
-  maxText = paste("More total", absolute_units[metric], "in", target, "visits relative to whole population within the",dimension)
+  minText = paste("Reduced", metric, "for", target, "patients")
+  maxText = paste("Excess", metric, "for", target, "patients")
   meanY=(max(targetValues) + min(targetValues)) / 2
   arrowX = textX - 0.5
   nudge = targetValues %>% sapply(abs) %>% mean() / 15
@@ -255,9 +264,13 @@ isolatedRelative <- function(dimension, determinant, metric, setting, campus, ta
   initialValues <- initialData %>% pull(!!as.symbol(names(initialData)[1])) %>% remove_attributes("names")
   rawData <- data.frame(initialValues)
   names(rawData)[1] <-  names(initialData)[1]
+  for (dim in 1:nrow(rawData)) {
+    count <- questions_df %>% filter(!!as.symbol(dimension)==rawData[dim,1], !!as.symbol(determinant)==target) %>% nrow()
+    rawData[dim,1] = paste(rawData[dim,1],paste("n=",count,sep=""),sep="\n")
+  }
   rawData["Ratio"] <- initialData %>% pull(!!as.symbol(target)) %>% remove_attributes("names")
-  title <- toTitleCase(paste("Discrepancy in",metric,"for patients with",determinant,"of",target,"by",dimension))
-  yLabel1 <- toTitleCase(paste("Actual / Equitable*",metric,"across all",target,"visits in each",dimension))
+  title <- paste("Which",dimension,"has the highest relative disparity in",metric,"for patients with",determinant,"of",paste(target,"?",sep=""))
+  yLabel1 <- toTitleCase(paste("Relative",average_units[metric],"for patients with",determinant,"of",target,"compared with all other",determinant,"groups."))
   yLabel2 <- paste("*In an equitable system, we would expect the average",average_units[metric],"to be the same across",paste(determinant,".",sep=""),"The graph above shows the ratio between the actual average",average_units[metric], "for",target,"visits and the equitable average",average_units[metric], "for each",paste(dimension,".",sep=""),"In a perfectly equitable",paste(dimension,",",sep=""),"the bar would be at 1.")
   targetValues = rawData %>% pull(Ratio)
   nudge = targetValues %>% sapply(abs) %>% mean() / 15
@@ -370,12 +383,12 @@ shinyServer(function(input, output, session) {
     
     observeEvent(toListen(), {
       if (input$Display == "") {
-        default <- "Graph"
+        default <- "ActualAvg"
       } else {
         default <- input$Display
       }
       averageActual <- paste("I want to look for disparities in",average_units[input$Outcome],"within each",input$Dimension,"across",paste(input$Determinant,".",sep=""))
-      specificDifference <- paste("Which",input$Dimension,"contributes most to the disparity in total",input$Outcome,"for patients with",input$Determinant,"of",paste(input$Target,"?",sep=""))
+      specificDifference <- paste("Which",input$Dimension,"should I focus on to improve the disparity in",input$Outcome,"by",input$Determinant,"for",input$Target, "patients?")
       relativeDifference <- paste("Which",input$Dimension,"has the highest relative disparity in",input$Outcome,"for patients with",input$Determinant,"of",paste(input$Target,"?",sep=""))
       fullDifference <- paste("Which",input$Dimension,"contributes most to the disparity in",input$Outcome,"across",paste(input$Determinant,"?",sep=""))
       newChoices = list()
