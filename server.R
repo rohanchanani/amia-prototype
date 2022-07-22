@@ -178,7 +178,7 @@ groupedBar <- function(dimension, determinant, metric, setting, campus) {
          + geom_segment(aes(x=arrowX,y=meanY+arrowOffset,xend=arrowX,yend=meanY+arrowOffset+arrowLength),arrow=arrow())
          + geom_segment(aes(x=arrowX,y=meanY-arrowOffset,xend=arrowX,yend=meanY-arrowOffset-arrowLength),arrow=arrow())
          + coord_flip(clip="off")
-         + geom_text(position=position_dodge(width=0.75),aes(y=!!as.symbol(metric)+sign(!!as.symbol(metric))*nudge - mini_nudge,fill=!!as.symbol(determinant),label=signif(!!as.symbol(metric), digits=2),hjust=0))
+         #+ geom_text(position=position_dodge(width=0.75),aes(y=!!as.symbol(metric)+sign(!!as.symbol(metric))*nudge - mini_nudge,fill=!!as.symbol(determinant),label=signif(!!as.symbol(metric), digits=2),hjust=0))
          + ggtitle(title)
          + labs(x=dimension, y=paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
 }
@@ -217,7 +217,7 @@ groupedActual <- function(dimension, determinant, metric, setting, campus) {
   return(ggplot(graphData, aes(fill=!!as.symbol(determinant), y=!!as.symbol(metric), x=!!as.symbol(dimension)))
          + geom_bar(position=position_dodge(0.75), width=0.75, stat="identity")
          + coord_flip(clip="off")
-         + geom_text(position=position_dodge(width=0.75),aes(y=!!as.symbol(metric)+sign(!!as.symbol(metric))*nudge - mini_nudge,fill=!!as.symbol(determinant),label=signif(!!as.symbol(metric), digits=2),hjust=0))
+         #+ geom_text(position=position_dodge(width=0.75),aes(y=!!as.symbol(metric)+sign(!!as.symbol(metric))*nudge - mini_nudge,fill=!!as.symbol(determinant),label=signif(!!as.symbol(metric), digits=2),hjust=0))
          + ggtitle(title)
          + labs(x=dimension, y=paste("Average",absolute_units[metric])))
 }
