@@ -87,13 +87,16 @@ fillPage(theme = shinytheme("united"),
          
                            ), # sidebarPanel
                            mainPanel(
+                             radioButtons("equitable", label = "equitable", choices = c("Actual", "Equitable"), selected="Actual"),
+                             htmlOutput("specificHighlight"),
+                             htmlOutput("relativeHighlight"),
+                             htmlOutput("fullSpecific"),
+                             htmlOutput("fullRelative"),
                              plotOutput("DiagnosticGraph", width="80%"),
                              plotOutput("GroupedGraph", width="80%"),
                              plotOutput("Graph", width="80%", click="specificClick"),
                              plotOutput("GroupedActualGraph", width="80%"),
                              plotOutput("RelativeGraph", click="relativeClick", width="80%"),
-                             dataTableOutput("specificHighlight"),
-                             dataTableOutput("relativeHighlight"),
                              dataTableOutput("ActualAvg"),
                              dataTableOutput("ActualTot"),
                              dataTableOutput("Expected"),
