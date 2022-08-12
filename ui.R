@@ -81,7 +81,7 @@ fillPage(theme = shinytheme("united"),
                              
                              selectInput("Target", label="The group I worry may be disadvantaged is:", choices=c()),
                              
-                             radioButtons("Sorting", label = "Which populations am I curious about?", choices = c("Most Inequitable", "Custom"), selected="Most Inequitable"),
+                             radioButtons("Sorting", label = "Which populations am I curious about?", choices = c("Custom", "Most Inequitable"), selected="Custom"),
                              
                              tags$div(id = "inline", selectInput("Dimension", label = "Refine by Sub-Populations:",choices = c("", "Zip Code", "Billing Diagnosis", "Admit Diagnosis"), selected="")),
                              
