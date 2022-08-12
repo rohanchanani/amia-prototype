@@ -428,7 +428,7 @@ createFullHighlight <- function(outputs, index, xVal, dimension, determinant, ta
 yielding a total of",round(totalDim, 2),absolute_units[metric],"of",paste(metric,".</li>",sep=""))
   item2 <- paste("<li>Among the",numDim,"patients with",dimension,"of",paste(dimVal,",",sep=""),paste(round(100*numPatients/numDim,1),"%",sep=""), "are",target,"patients. Imagine that the average",average_units[metric], "was equal across all",determinant,"groups. In that case, we would expect the",numPatients,target,"patients to have",round(equitable, 2),"total",absolute_units[metric],"of",paste(metric,".</li>",sep=""))
   item3 <- paste("<li>In reality,",target,"patients had",round(total, 2), "total",absolute_units[metric],"of",paste(metric,".</li>",sep=""))
-  item4 <- paste("<li>The",keyword,"of Actual",symbol,"Equitable is",paste(round(difference, 2),".</li>",sep=""))
+  item4 <- paste("<li>The",keyword,"of Actual",symbol,"Equitable is",round(difference, 2),paste(absolute_units[metric],".</li>",sep=""))
   item5 <- paste("<li>The",dimension,"with the",directionality,"Actual",symbol,"Equitable value may give you the most \"bang for your buck\" to resolve the disparity in",metric,"by",determinant,"group globally.</li></ol>")
   return(HTML(paste(header, item1, item2, item3, item4, item5,sep="\n")))
 }
