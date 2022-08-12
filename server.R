@@ -410,12 +410,12 @@ createFullHighlight <- function(outputs, index, xVal, dimension, determinant, ta
   difference <- actualDifference[xVal,target]
   equitable <- total - difference
   header <- "<h4>How this graph works:</h4><ol>"
-  item1 <- paste("<li>The average",average_units[metric],"across all",dimVal,"patients was",round(avgDim,2),"for",numDim,"patients,
+  item1 <- paste("<li>The average",average_units[metric],"across all patients with",dimension,"of",dimVal, "was",round(avgDim,2),"for",paste("n=",numDim,sep=""),"patients,
 yielding a total of",round(totalDim, 2),absolute_units[metric],"of",paste(metric,".</li>",sep=""))
-  item2 <- paste("<li>Among the",numDim,"patients with",dimension,"of",paste(dimVal,",",sep=""),paste(round(100*numPatients/numDim,1),"%",sep=""), "have",paste(target,".",sep=""), "Imagine that the average",average_units[metric], "was equal across all",determinant,"groups. In that case, we would expect the",numPatients,target,"patients to have",round(equitable, 2),"total",absolute_units[metric],"of",paste(metric,".</li>",sep=""))
+  item2 <- paste("<li>Among the",numDim,"patients with",dimension,"of",paste(dimVal,",",sep=""),paste(round(100*numPatients/numDim,1),"%",sep=""), "are",target,"patients. Imagine that the average",average_units[metric], "was equal across all",determinant,"groups. In that case, we would expect the",numPatients,target,"patients to have",round(equitable, 2),"total",absolute_units[metric],"of",paste(metric,".</li>",sep=""))
   item3 <- paste("<li>In reality,",target,"patients had",round(total, 2), "total",absolute_units[metric],"of",paste(metric,".</li>",sep=""))
   item4 <- paste("<li>The",keyword,"of Actual",symbol,"Equitable is",paste(round(difference, 2),".</li>",sep=""))
-  item5 <- paste("<li>The",dimension,"with the",directionality,"Actual",symbol,"Equitable value may give you the most bang for your buck to resolve the disparity in",metric,"by",determinant,"group globally.</li></ol>")
+  item5 <- paste("<li>The",dimension,"with the",directionality,"Actual",symbol,"Equitable value may give you the most \"bang for your buck\" to resolve the disparity in",metric,"by",determinant,"group globally.</li></ol>")
   return(HTML(paste(header, item1, item2, item3, item4, item5,sep="\n")))
 }
 
