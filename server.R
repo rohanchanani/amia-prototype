@@ -100,16 +100,30 @@ diagnosticGraph <- function(determinant, metric, setting, campus, equitable) {
   return(ggplot(data=graphTable, aes(x=determinant, y=metric)) + geom_bar(aes(x=determinant), stat='identity') + geom_text(aes(y=metric+nudge*sign(metric), label = signif(metric, digits=2))) + coord_flip() + ggtitle(toTitleCase(paste(metric, "by", determinant))) + labs(x=toTitleCase(determinant), y=toTitleCase(paste("Average",average_units[metric]))))
 }
 
+getDifferences <- function(dim, dimension="", determinant="", target="", metric="") {
+  dimVec <- questions_df %>% filter(!!as.symbol(dimension)==dim, !!as.symbol(determinant)==target) %>% pull(!!as.symbol(metric))
+  actual <- dimVec %>% sum()
+  equitable <- questions_df %>% filter(!!as.symbol(dimension)==dim) %>% pull(!!as.symbol(metric)) %>% calcMean()
+  return(actual-(equitable*length(dimVec)))
+}
+
 getOptions <- function(dimension, determinant, metric, setting, campus, target) {
-  allDims <- questions_df %>% distinct(!!as.symbol(dimension)) %>% pull(!!as.symbol(dimension))
-  differences <- c()
-  for (dim in 1:length(allDims)) {
-    dimVec <- questions_df %>% filter(!!as.symbol(dimension)==allDims[dim], !!as.symbol(determinant)==target) %>% pull(!!as.symbol(metric))
-    actual <- dimVec %>% sum()
-    equitable <- questions_df %>% filter(!!as.symbol(dimension)==allDims[dim]) %>% pull(!!as.symbol(metric)) %>% calcMean()
-    differences <- append(differences, actual-(equitable*length(dimVec)))
+  initialDims <- questions_df %>% distinct(!!as.symbol(dimension)) %>% pull(!!as.symbol(dimension))
+  dimLength <- length(initialDims)
+  if (dimLength > 500) {
+    allRows <- nrow(questions_df)
+    allDims <- c()
+    for (dim in 1:length(initialDims)) {
+      if (nrow(filter(questions_df, !!as.symbol(dimension)==initialDims[dim])) > allRows *3 / dimLength) {
+        allDims <- append(allDims, initialDims[dim])
+      }
+    }
+    print(length(allDims))
+  } else {
+    allDims <- initialDims
   }
-  tempFrame <- data.frame(dim=allDims, diff=differences)
+  differences <- sapply(allDims, getDifferences, dimension=dimension, determinant=determinant, target=target, metric=metric)
+  tempFrame <- data.frame(allDims, differences)
   return(arrange(tempFrame, desc(differences))[1:6,1])
 }
 
