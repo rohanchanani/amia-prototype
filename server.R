@@ -11,14 +11,14 @@ library(shinythemes)
 library(shinyjs)
 
 
-questions_df <- read_csv("https://raw.githubusercontent.com/rohanchanani/ApprenticeshipKMS/main/questions.csv")
+questions_df <- read_csv("processed_patient.csv")
 specifications <- c("Setting", "Campus")
-average_units = c("Length of Stay"="Length of Stay (Hours)", "Readmissions"="Readmission Rate")
-absolute_units = c("Length of Stay"="Hours", "Readmissions"="Occurences")
-directions = c("Length of Stay"=TRUE, "Readmissions"=TRUE)
-companies <- questions_df %>% distinct(company_name) %>% pull(company_name)
+average_units = c("Length of Stay"="Length of Stay (Hours)", "7 Day Unplanned Readmissions"="7 Day Unplanned Readmission Rate")
+absolute_units = c("Length of Stay"="Hours", "7 Day Unplanned Readmissions"="Occurences")
+directions = c("Length of Stay"=TRUE, "7 Day Unplanned Readmissions"=TRUE)
+#companies <- questions_df %>% distinct(company_name) %>% pull(company_name)
 company_replacements <- c("30305", "30306", "30307", "30308", "30309")
-sections <- questions_df %>% distinct(section) %>% pull(section)
+#sections <- questions_df %>% distinct(section) %>% pull(section)
 section_replacements <- c("Asthma", "Sickle Cell", "Cystic Fibrosis", "Hemophilia", "Myocarditis", "Kawasaki disease", "Leukemia")
 normalText <- "<span style='font-weight:normal;'>"
 
@@ -63,26 +63,25 @@ calcMean <- function(array) {
   }
 }
 
-questions_df <- questions_df %>% mutate(Disease=full_section(section), "Zip Code"=full_company(company_name), Insurance=sapply(question, rand_insurance), "Length of Stay"=nchar(question)+nchar(answer), Readmissions=sapply(question, rand_admit), Setting=sapply(question, rand_setting), Campus=sapply(question, rand_campus)) %>% subset(select=c("Disease", "Zip Code", "Insurance", "Length of Stay", "Readmissions", "Setting", "Campus")) %>% na.omit()
+#questions_df <- questions_df %>% mutate(Disease=full_section(section), "Zip Code"=full_company(company_name), Insurance=sapply(question, rand_insurance), "Length of Stay"=nchar(question)+nchar(answer), Readmissions=sapply(question, rand_admit), Setting=sapply(question, rand_setting), Campus=sapply(question, rand_campus)) %>% subset(select=c("Disease", "Zip Code", "Insurance", "Length of Stay", "Readmissions", "Setting", "Campus")) %>% na.omit()
 
-get_actual <- function(setting, campus) {
+get_actual <- function(dimension, options, setting="All", campus="All") {
   if (setting != "All") {
     questions_df <- questions_df %>% filter(Setting==setting)
   }
   if (campus != "All") {
     questions_df <- questions_df %>% filter(Campus==campus)
   }
+  if (!(options[1] %in% pull(questions_df, !!as.symbol(dimension)))) {
+    dimPossibilities = questions_df %>% distinct(!!as.symbol(dimension)) %>% pull(!!as.symbol(dimension)) %>% remove_attributes("names")
+    options <- c(dimPossibilities[1])
+  }
+  questions_df <- questions_df %>% filter(!!as.symbol(dimension) %in% options)
   return(questions_df)
 }
 
 diagnosticGraph <- function(determinant, metric, setting, campus, equitable) {
   usableData <- questions_df
-  speciValues <- c(setting, campus)
-  for (speci in 1:length(specifications)) {
-    if (speciValues[speci] != "All") {
-      usableData <- usableData %>% filter(!!as.symbol(specifications[speci])==speciValues[speci])
-    }
-  }
   determinantPossibilities <- usableData %>% distinct(!!as.symbol(determinant)) %>% pull(!!as.symbol(determinant)) %>% remove_attributes("names")
   graphTable <- data.frame(determinantPossibilities)
   names(graphTable)[1] <- 'determinant'
@@ -93,14 +92,29 @@ diagnosticGraph <- function(determinant, metric, setting, campus, equitable) {
     } else {
       metricValues[row] <- usableData %>% filter(!!as.symbol(determinant)==determinantPossibilities[row]) %>% pull(!!as.symbol(metric)) %>% calcMean()
     }
+    num <- usableData %>% filter(!!as.symbol(determinant)==graphTable[row,1]) %>% nrow()
+    graphTable[row,1] <- paste(graphTable[row,1], paste("n=",num,sep=""),sep="\n")
   }
   graphTable['metric'] <- metricValues
   nudge = metricValues %>% sapply(abs) %>% mean() / 15
   return(ggplot(data=graphTable, aes(x=determinant, y=metric)) + geom_bar(aes(x=determinant), stat='identity') + geom_text(aes(y=metric+nudge*sign(metric), label = signif(metric, digits=2))) + coord_flip() + ggtitle(toTitleCase(paste(metric, "by", determinant))) + labs(x=toTitleCase(determinant), y=toTitleCase(paste("Average",average_units[metric]))))
 }
 
-createTables <- function(dimension, determinant, metric, setting, campus) {
-  targetData <- questions_df %>% filter(Setting==setting, Campus==campus)
+getOptions <- function(dimension, determinant, metric, setting, campus, target) {
+  allDims <- questions_df %>% distinct(!!as.symbol(dimension)) %>% pull(!!as.symbol(dimension))
+  differences <- c()
+  for (dim in 1:length(allDims)) {
+    dimVec <- questions_df %>% filter(!!as.symbol(dimension)==allDims[dim], !!as.symbol(determinant)==target) %>% pull(!!as.symbol(metric))
+    actual <- dimVec %>% sum()
+    equitable <- questions_df %>% filter(!!as.symbol(dimension)==allDims[dim]) %>% pull(!!as.symbol(metric)) %>% calcMean()
+    differences <- append(differences, actual-(equitable*length(dimVec)))
+  }
+  tempFrame <- data.frame(dim=allDims, diff=differences)
+  return(arrange(tempFrame, desc(differences))[1:6,1])
+}
+
+createTables <- function(dimension, determinant, metric, options, setting, campus, target) {
+  questions_df <- get_actual(dimension, options, setting, campus)
   values1 <- questions_df %>% distinct(!!as.symbol(dimension)) %>% pull(!!as.symbol(dimension)) %>% remove_attributes("names")
   outputTable <- data.frame(values1)
   names(outputTable)[1] <- dimension
@@ -147,9 +161,9 @@ createSpecific <- function(actual, expected, difference, target) {
   return(output[order(output$Difference),])
 }
 
-groupedBar <- function(dimension, determinant, metric, setting, campus, equitable=FALSE) {
-  questions_df <- get_actual(setting, campus)
-  rawData <- data.frame(createTables(dimension, determinant, metric, setting, campus)[4], check.names = FALSE)
+groupedBar <- function(dimension, determinant, metric, options, setting, campus, target, equitable=FALSE) {
+  questions_df <- get_actual(dimension, options, setting, campus)
+  rawData <- data.frame(createTables(dimension, determinant, metric, options, setting, campus, target)[4], check.names = FALSE)
   graphData <- data.frame(graphDim=character(), graphDet=character(), graphMet=numeric())
   names(graphData)[1] <- dimension
   names(graphData)[2] <- determinant
@@ -174,7 +188,7 @@ groupedBar <- function(dimension, determinant, metric, setting, campus, equitabl
     }
   }
   title <- paste("Which",dimension,"contributes most to the disparity in",metric,"across",paste(determinant,"?",sep=""))
-  yLabel1 <- toTitleCase(paste("Actual - Equitable*","Total",absolute_units[metric],"across all visits in each",dimension))
+  yLabel1 <- toTitleCase(paste("Actual - Equitable*","Total",metric,paste("(",absolute_units[metric],")",sep=""),"across all visits in each",dimension))
   yLabel2 <- paste("*In an equitable system, we would expect the average",average_units[metric],"to be the same across",paste(determinant,".",sep=""),"The graph above shows the difference between the actual cumulative",metric, "and the equitable cumulative",metric,"for all visits in each",paste(dimension,".",sep=""),"If the average",average_units[metric],"was equal across", determinant,"for patients with a specific",paste(dimension,",",sep=""), "the bar would be at 0.")
   textX = 1.5 + rawData %>% pull(!!as.symbol(dimension)) %>% length()
   textY1 = min(allVals) + (max(allVals) - min(allVals)) * 0.2
@@ -206,9 +220,9 @@ groupedBar <- function(dimension, determinant, metric, setting, campus, equitabl
          + labs(x=dimension, y=paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
 }
 
-groupedActual <- function(dimension, determinant, metric, setting, campus, equitable=FALSE) {
-  questions_df <- get_actual(setting, campus)
-  rawData <- data.frame(createTables(dimension, determinant, metric, setting, campus)[1], check.names = FALSE)
+groupedActual <- function(dimension, determinant, metric, options, setting, campus, target, equitable=FALSE) {
+  questions_df <- get_actual(dimension, options, setting, campus)
+  rawData <- data.frame(createTables(dimension, determinant, metric, options, setting, campus, target)[1], check.names = FALSE)
   graphData <- data.frame(graphDim=character(), graphDet=character(), graphMet=numeric())
   names(graphData)[1] <- dimension
   names(graphData)[2] <- determinant
@@ -246,12 +260,18 @@ groupedActual <- function(dimension, determinant, metric, setting, campus, equit
          + coord_flip(clip="off")
          #+ geom_text(position=position_dodge(width=0.75),aes(y=!!as.symbol(metric)+sign(!!as.symbol(metric))*nudge - mini_nudge,fill=!!as.symbol(determinant),label=signif(!!as.symbol(metric), digits=2),hjust=0))
          + ggtitle(title)
-         + labs(x=dimension, y=paste("Average",absolute_units[metric])))
+         + labs(x=dimension, y=paste("Average",average_units[metric])))
 }
 
-isolatedBar <- function(dimension, determinant, metric, setting, campus, target, equitable=FALSE, index=4) {
-  questions_df <- get_actual(setting, campus)
-  initialData <- data.frame(createTables(dimension, determinant, metric, setting, campus)[index], check.names = FALSE)
+positive <- function(number) {
+  if (number > 0) {
+    return("")
+  }
+}
+
+isolatedBar <- function(dimension, determinant, metric, options, setting, campus, target, equitable=FALSE, index=4) {
+  questions_df <- get_actual(dimension, options, setting, campus)
+  initialData <- data.frame(createTables(dimension, determinant, metric, options, setting, campus, target)[index], check.names = FALSE)
   initialValues <- initialData %>% pull(!!as.symbol(names(initialData)[1])) %>% remove_attributes("names")
   rawData <- data.frame(initialValues)
   names(rawData)[1] <-  names(initialData)[1]
@@ -265,9 +285,10 @@ isolatedBar <- function(dimension, determinant, metric, setting, campus, target,
       rawData[row,"Difference"] <- 0
     }
   }
+  rawData <- rawData %>% mutate(color=sapply(Difference, positive))
   title <- paste("Which",dimension,"should I focus on to improve the disparity in",metric,"by",determinant,"for",target, "patients?")
-  yLabel1 <- toTitleCase(paste("Actual - Equitable* total",absolute_units[metric],"across all",target,"visits in each",dimension))
-  yLabel2 <- paste("*In an equitable system, we would expect the average",average_units[metric],"to be the same across",paste(determinant,".",sep=""),"The graph above shows the difference between the actual cumulative",metric, "for",target,"visits and the equitable cumulative",metric, "for each",paste(dimension,".",sep=""),"If the average",average_units[metric],"was equal across", determinant,"for patients with a specific",paste(dimension,",",sep=""), "the bar would be at 0.")
+  yLabel1 <- toTitleCase(paste("Actual - Equitable* total",metric,paste("(",absolute_units[metric],")",sep=""),"across all",target,"visits in each",dimension))
+  #yLabel2 <- paste("*In an equitable system, we would expect the average",average_units[metric],"to be the same across",paste(determinant,".",sep=""),"The graph above shows the difference between the actual cumulative",metric, "for",target,"visits and the equitable cumulative",metric, "for each",paste(dimension,".",sep=""),"If the average",average_units[metric],"was equal across", determinant,"for patients with a specific",paste(dimension,",",sep=""), "the bar would be at 0.")
   textX = 1.5 + rawData %>% pull(!!as.symbol(dimension)) %>% length()
   targetValues = initialData %>% pull(!!as.symbol(target)) %>% remove_attributes("names")
   textY1 = min(targetValues) + (max(targetValues) - min(targetValues)) * 0.2
@@ -295,12 +316,12 @@ isolatedBar <- function(dimension, determinant, metric, setting, campus, target,
          + coord_flip(clip="off")
          + geom_text(aes(y=Difference + nudge*sign(Difference),label = signif(Difference, digits=2)))
          + ggtitle(title)
-         + labs(x=dimension, y=paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
+         + labs(x=dimension, y=yLabel1))#paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
 }
 
-isolatedRelative <- function(dimension, determinant, metric, setting, campus, target, equitable=FALSE,  index=5) {
-  questions_df <- get_actual(setting, campus)
-  initialData <- data.frame(createTables(dimension, determinant, metric, setting, campus)[index], check.names = FALSE)
+isolatedRelative <- function(dimension, determinant, metric, options, setting, campus, target, equitable=FALSE,  index=5) {
+  questions_df <- get_actual(dimension, options, setting, campus)
+  initialData <- data.frame(createTables(dimension, determinant, metric, options, setting, campus, target)[index], check.names = FALSE)
   initialValues <- initialData %>% pull(!!as.symbol(names(initialData)[1])) %>% remove_attributes("names")
   rawData <- data.frame(initialValues)
   names(rawData)[1] <-  names(initialData)[1]
@@ -316,7 +337,7 @@ isolatedRelative <- function(dimension, determinant, metric, setting, campus, ta
   }
   title <- paste("Which",dimension,"has the highest relative disparity in",metric,"for patients with",determinant,"of",paste(target,"?",sep=""))
   yLabel1 <- toTitleCase(paste("Relative",average_units[metric],"for patients with",determinant,"of",target,"compared with all other",determinant,"groups."))
-  yLabel2 <- paste("*In an equitable system, we would expect the average",average_units[metric],"to be the same across",paste(determinant,".",sep=""),"The graph above shows the ratio between the actual average",average_units[metric], "for",target,"visits and the equitable average",average_units[metric], "for each",paste(dimension,".",sep=""),"In a perfectly equitable",paste(dimension,",",sep=""),"the bar would be at 1.")
+  #yLabel2 <- paste("*In an equitable system, we would expect the average",average_units[metric],"to be the same across",paste(determinant,".",sep=""),"The graph above shows the ratio between the actual average",average_units[metric], "for",target,"visits and the equitable average",average_units[metric], "for each",paste(dimension,".",sep=""),"In a perfectly equitable",paste(dimension,",",sep=""),"the bar would be at 1.")
   targetValues = initialData %>% pull(!!as.symbol(target)) %>% remove_attributes("names")
   nudge = targetValues %>% sapply(abs) %>% mean() / 15
   return(ggplot(data=rawData, aes(x=reorder(!!as.symbol(dimension), Ratio), y=Ratio))
@@ -324,7 +345,7 @@ isolatedRelative <- function(dimension, determinant, metric, setting, campus, ta
          + coord_flip(clip="off")
          + geom_text(aes(y=Ratio + nudge*sign(Ratio),label = signif(Ratio, digits=2)))
          + ggtitle(title)
-         + labs(x=dimension, y=paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
+         + labs(x=dimension, y=yLabel1))#paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
 }
 
 oldCreateHighlight <- function(outputs, index, xVal, dimension, determinant, target,metric) {
@@ -354,15 +375,15 @@ oldCreateHighlight <- function(outputs, index, xVal, dimension, determinant, tar
   return(results)
 }
 
-createHighlight <- function(outputs, index, dimension, determinant, target,metric) {
+createHighlight <- function(outputs, index, dimension, determinant, target,metric, options) {
   firstPart <- paste("The bars represent the difference in total",absolute_units[metric],"of",metric,"among children with",determinant,"of",target,"compared to what it would be if average",average_units[metric],"was equal across",determinant,"groups.")
   secondPart <- "Click on a bar to see more details of how this graph works."
   result <- paste("<h3>",normalText,firstPart,"</span><b> ",secondPart,"</b></h3>")
   return(HTML(result))
 }
 
-createFullHighlight <- function(outputs, index, xVal, dimension, determinant, target,metric, setting, campus) {
-  questions_df <- get_actual(setting, campus)
+createFullHighlight <- function(outputs, index, xVal, dimension, determinant, target,metric, options, setting, campus) {
+  questions_df <- get_actual(dimension, options, setting, campus)
   actualTable <- data.frame(outputs[1], check.names=FALSE)
   totalTable <- data.frame(outputs[2], check.names=FALSE)
   actualDifference <- data.frame(outputs[6-index], check.names=FALSE)
@@ -389,11 +410,11 @@ createFullHighlight <- function(outputs, index, xVal, dimension, determinant, ta
   difference <- actualDifference[xVal,target]
   equitable <- total - difference
   header <- "<h4>How this graph works:</h4><ol>"
-  item1 <- paste("<li>The average",average_units[metric],"across all",dimVal,"patients was",avgDim,"for",numDim,"patients,
-yielding a total of",totalDim,absolute_units[metric],"of",paste(metric,".</li>",sep=""))
-  item2 <- paste("<li>Among the",numDim,dimVal,"patients,",paste(signif(100*numPatients/numDim,3),"%",sep=""), "have",paste(target,".",sep=""), "Imagine that the average",average_units[metric], "was equal across all",determinant,"groups. In that case, we would expect",target,"patients to have",equitable,"total",absolute_units[metric],"of",paste(metric,".</li>",sep=""))
-  item3 <- paste("<li>In reality,",target,"patients had",total, "total",absolute_units[metric],"of",paste(metric,".</li>",sep=""))
-  item4 <- paste("<li>The",keyword,"of Actual",symbol,"Equitable is",paste(difference,".</li>",sep=""))
+  item1 <- paste("<li>The average",average_units[metric],"across all",dimVal,"patients was",round(avgDim,2),"for",numDim,"patients,
+yielding a total of",round(totalDim, 2),absolute_units[metric],"of",paste(metric,".</li>",sep=""))
+  item2 <- paste("<li>Among the",numDim,"patients with",dimension,"of",paste(dimVal,",",sep=""),paste(round(100*numPatients/numDim,1),"%",sep=""), "have",paste(target,".",sep=""), "Imagine that the average",average_units[metric], "was equal across all",determinant,"groups. In that case, we would expect the",numPatients,target,"patients to have",round(equitable, 2),"total",absolute_units[metric],"of",paste(metric,".</li>",sep=""))
+  item3 <- paste("<li>In reality,",target,"patients had",round(total, 2), "total",absolute_units[metric],"of",paste(metric,".</li>",sep=""))
+  item4 <- paste("<li>The",keyword,"of Actual",symbol,"Equitable is",paste(round(difference, 2),".</li>",sep=""))
   item5 <- paste("<li>The",dimension,"with the",directionality,"Actual",symbol,"Equitable value may give you the most bang for your buck to resolve the disparity in",metric,"by",determinant,"group globally.</li></ol>")
   return(HTML(paste(header, item1, item2, item3, item4, item5,sep="\n")))
 }
@@ -419,10 +440,12 @@ shinyServer(function(input, output, session) {
     hide("DimLabel")
     hide("heading")
     hide("macroView")
-    for (speci in 1:length(specifications)) {
-      specVals <- questions_df %>% distinct(!!as.symbol(specifications[speci])) %>% pull(!!as.symbol(specifications[speci])) %>% remove_attributes("names")
-      updateSelectInput(session, specifications[speci], choices = c("All", specVals), selected="All")
-    }
+    hide("Options")
+    hide("Search")
+    #for (speci in 1:length(specifications)) {
+    #  specVals <- questions_df %>% distinct(!!as.symbol(specifications[speci])) %>% pull(!!as.symbol(specifications[speci])) %>% remove_attributes("names")
+    #  updateSelectInput(session, specifications[speci], choices = c("All", specVals), selected="All")
+    #}
     initialPossibilities <- questions_df %>% distinct(Insurance) %>% pull(Insurance) %>% remove_attributes("names")
     updateSelectInput(session, "Target", choices =initialPossibilities, selected=initialPossibilities[0])
     observeEvent(input$Determinant, {
@@ -430,6 +453,9 @@ shinyServer(function(input, output, session) {
       updateSelectInput(session, "Target", choices =targetPossibilities(), selected=targetPossibilities()[0])
     })
     output$DiagnosticGraph <- renderPlot({diagnosticGraph(input$Determinant, input$Outcome, input$Setting, input$Campus, input$equitable=="Equitable")})
+    observeEvent(input$Search, {
+      
+    })
     observeEvent(input$diveDeeper, {
       show("Target")
       if (input$Target!=""){
@@ -442,7 +468,7 @@ shinyServer(function(input, output, session) {
       show("macroView")
       macro=FALSE
       updateSelectInput(session, "Target", selected="")
-      updateSelectInput(session, "Dimension", choices = c("", "Zip Code", "Disease"), selected="")
+      updateSelectInput(session, "Dimension", choices = c("", "Zip Code", "Billing Diagnosis", "Admit Diagnosis"), selected="")
     })
     observeEvent(input$macroView, {
       updateSelectInput(session, "Target", selected="")
@@ -488,8 +514,26 @@ shinyServer(function(input, output, session) {
       updateSelectInput(session,"Display",choices=newChoices, selected=default)
     })
     
+    observeEvent(input$Dimension, {
+      output$SearchVal <- renderText({paste("Search", input$Dimension)})
+      if (input$Dimension != "" & input$Target != "") {
+        dimPossibilities = questions_df %>% distinct(!!as.symbol(input$Dimension)) %>% pull(!!as.symbol(input$Dimension)) %>% remove_attributes("names")
+        updateCheckboxGroupInput(session, "Options", choices =dimPossibilities, selected=dimPossibilities[1])
+        click("Options")
+      }
+    })
+    
     observe({
-      if (input$Dimension=="" | input$Target=="") {
+      if (input$Dimension=="" | input$Target=="" | !(isTruthy(input$Options))) {
+        if (input$Dimension=="" | input$Target=="") {
+          hide("Options")
+          hide("Search")
+          hide("SelectAll")
+        } else {
+          show("Options")
+          show("Search")
+          show("SelectAll")
+        }
         hide("specificHighlight")
         hide("relativeHighlight")
         hide("fullSpecific") 
@@ -503,13 +547,25 @@ shinyServer(function(input, output, session) {
           hide(ids[id])
         }
       } else {
+        if (input$Sorting=="Custom") {
+          show("Options")
+          show("Search")
+        } else {
+          hide("Options")
+          hide("Search")
+        }
         show("Dimension")
         show("Question")
         show("DimLabel")
         show("heading")
         show("Display")
         hide("DiagnosticGraph")
-        outputs <- createTables(input$Dimension, input$Determinant, input$Outcome, input$Setting, input$Campus)
+        if (input$Sorting=="Custom") {
+          options <- input$Options
+        } else {
+          options <- getOptions(input$Dimension, input$Determinant, input$Outcome, input$Setting, input$Campus, input$Target)
+        }
+        outputs <- createTables(input$Dimension, input$Determinant, input$Outcome, options, input$Setting, input$Campus, input$Target)
         output$ActualAvg <- renderDataTable({data.frame(outputs[1], check.names=FALSE)})
         total <- data.frame(outputs[2], check.names=FALSE)
         expected <- data.frame(outputs[3], check.names=FALSE)
@@ -519,12 +575,13 @@ shinyServer(function(input, output, session) {
         output$Difference <- renderDataTable({difference})
         output$RelativeTable <- renderDataTable({data.frame(outputs[5], check.names=FALSE)})
         output$SpecificTable <- renderDataTable({createSpecific(total, expected, difference, input$Target)})
-        output$GroupedGraph <- renderPlot({groupedBar(input$Dimension, input$Determinant, input$Outcome, input$Setting, input$Campus, input$equitable=="Equitable")})
-        output$GroupedActualGraph <- renderPlot({groupedActual(input$Dimension, input$Determinant, input$Outcome, input$Setting, input$Campus, input$equitable=="Equitable")})
-        output$Graph <- renderPlot({isolatedBar(input$Dimension, input$Determinant, input$Outcome, input$Setting, input$Campus, input$Target, input$equitable=="Equitable")})
-        output$RelativeGraph <- renderPlot({isolatedRelative(input$Dimension, input$Determinant, input$Outcome, input$Setting, input$Campus, input$Target, input$equitable=="Equitable")})
-        output$specificHighlight <- renderUI({createHighlight(outputs, 2, input$Dimension, input$Determinant, input$Target,input$Outcome)})
-        output$relativeHighlight <- renderUI({createHighlight(outputs, 1, input$Dimension, input$Determinant, input$Target,input$Outcome)})
+        output$GroupedGraph <- renderPlot({groupedBar(input$Dimension, input$Determinant, input$Outcome, options, input$Setting, input$Campus, input$Target, input$equitable=="Equitable")})
+        output$GroupedActualGraph <- renderPlot({groupedActual(input$Dimension, input$Determinant, input$Outcome, options, input$Setting, input$Campus, input$Target, input$equitable=="Equitable")})
+        output$Graph <- renderPlot({isolatedBar(input$Dimension, input$Determinant, input$Outcome, options, input$Setting, input$Campus, input$Target, input$equitable=="Equitable")})
+        output$RelativeGraph <- renderPlot({isolatedRelative(input$Dimension, input$Determinant, input$Outcome, options, input$Setting, input$Campus, input$Target, input$equitable=="Equitable")})
+        output$specificHighlight <- renderUI({createHighlight(outputs, 2, input$Dimension, input$Determinant, input$Target,input$Outcome, options)})
+        output$relativeHighlight <- renderUI({createHighlight(outputs, 1, input$Dimension, input$Determinant, input$Target,input$Outcome, options)})
+        click("Options")
         if (!is.null(input$specificClick)) {
           specx <- input$specificClick$x
           specy <- input$specificClick$y
@@ -532,7 +589,7 @@ shinyServer(function(input, output, session) {
             actualIdx <- match(arrange(difference,!!as.symbol(input$Target))[round(specy),input$Target], pull(difference,!!as.symbol(input$Target)))
             actualVal = difference[actualIdx,input$Target]
             if (specx > min(actualVal, 0) & specx < max(0,actualVal)) {
-              output$fullSpecific <- renderUI({createFullHighlight(outputs, 2, actualIdx, input$Dimension, input$Determinant, input$Target,input$Outcome, input$Setting, input$Campus)})
+              output$fullSpecific <- renderUI({createFullHighlight(outputs, 2, actualIdx, input$Dimension, input$Determinant, input$Target,input$Outcome, options, input$Setting, input$Campus)})
               show("fullSpecific")
             }
           } 
@@ -545,7 +602,7 @@ shinyServer(function(input, output, session) {
             actualIdx <- match(arrange(ratio,!!as.symbol(input$Target))[round(rely),input$Target], pull(ratio,!!as.symbol(input$Target)))
             actualVal = ratio[actualIdx,input$Target]
             if (relx > min(actualVal, 0) & relx < max(0,actualVal)) {
-              output$fullRelative <- renderUI({createFullHighlight(outputs, 1, actualIdx, input$Dimension, input$Determinant, input$Target,input$Outcome, input$Setting, input$Campus)})
+              output$fullRelative <- renderUI({createFullHighlight(outputs, 1, actualIdx, input$Dimension, input$Determinant, input$Target,input$Outcome, options, input$Setting, input$Campus)})
               show("fullRelative")
             }
           } 

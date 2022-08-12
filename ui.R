@@ -6,12 +6,12 @@ library(readr)
 library(stringr)
 library(tableHTML)
 
-questions_df <- read_csv("https://raw.githubusercontent.com/rohanchanani/ApprenticeshipKMS/main/questions.csv")
+questions_df <- read_csv("processed_patient.csv")
 specifications <- c("Setting", "Campus")
 
-companies <- questions_df %>% distinct(company_name) %>% pull(company_name)
+#companies <- questions_df %>% distinct(company_name) %>% pull(company_name)
 company_replacements <- c("30305", "30306", "30307", "30308", "30309")
-sections <- questions_df %>% distinct(section) %>% pull(section)
+#sections <- questions_df %>% distinct(section) %>% pull(section)
 section_replacements <- c("Asthma", "Sickle Cell", "Cystic Fibrosis", "Hemophilia", "Myocarditis", "Kawasaki disease", "Leukemia")
 replace_company <- function(company) {
   return(company_replacements[match(company, companies)])
@@ -53,7 +53,7 @@ calcMean <- function(array) {
   }
 }
 
-questions_df <- questions_df %>% mutate(Disease=full_section(section), "Zip Code"=full_company(company_name), Insurance=sapply(question, rand_insurance), "Length of Stay"=nchar(question)+nchar(answer), Readmissions=sapply(question, rand_admit), Setting=sapply(question, rand_setting), Campus=sapply(question, rand_campus)) %>% subset(select=c("Disease", "Zip Code", "Insurance", "Length of Stay", "Readmissions", "Setting", "Campus")) %>% na.omit()
+#questions_df <- questions_df %>% mutate(Disease=full_section(section), "Zip Code"=full_company(company_name), Insurance=sapply(question, rand_insurance), "Length of Stay"=nchar(question)+nchar(answer), Readmissions=sapply(question, rand_admit), Setting=sapply(question, rand_setting), Campus=sapply(question, rand_campus)) %>% subset(select=c("Disease", "Zip Code", "Insurance", "Length of Stay", "Readmissions", "Setting", "Campus")) %>% na.omit()
 
 fillPage(theme = shinytheme("united"),
                   # theme = "cerulean",  # <--- To use a theme, uncomment this
@@ -63,16 +63,16 @@ fillPage(theme = shinytheme("united"),
                              HTML("<h5 style='font-weight:bold;'>My population of interest is:</h5>"),
                              
                              selectInput("Setting", label = "Setting:", 
-                                         choices = c()),
+                                         choices = c("All")),
                              
                              selectInput("Campus", label = "Campus:", 
-                                         choices = c()),
+                                         choices = c("All")),
                              
                              selectInput("Outcome", label = "My outcome of interest is:", 
-                                         choices = c("Readmissions", "Length of Stay"), selected="Readmissions"),
+                                         choices = c("7 Day Unplanned Readmissions", "Length of Stay"), selected="Readmissions"),
                              
                              selectInput("Determinant", label = "I want to look for disparities by:", 
-                                         choices = c("Insurance"), 
+                                         choices = c("Insurance", "Race", "Ethnicity", "Gender"), 
                                          selected = "Insurance"),
                              tags$head(tags$style(make_css(list('.btn', 'white-space', 'pre-wrap')))),
                              
@@ -81,13 +81,19 @@ fillPage(theme = shinytheme("united"),
                              
                              selectInput("Target", label="The group I worry may be disadvantaged is:", choices=c()),
                              
-                             tags$div(id = "inline", selectInput("Dimension", label = "Refine by Sub-Populations:",choices = c("", "Zip Code", "Disease"), selected="")),
+                             tags$div(id = "inline", selectInput("Dimension", label = "Refine by Sub-Populations:",choices = c("", "Zip Code", "Billing Diagnosis", "Admit Diagnosis"), selected="")),
+                             
+                             radioButtons("Sorting", label = "", choices = c("Most Inequitable", "Custom"), selected="Most Inequitable"),
+                             
+                             textInput("Search", label=verbatimTextOutput("SearchVal")),
+                             
+                             checkboxGroupInput("Options", label=""),
                              
                              selectInput("Display", label="Question", choices=c())
          
                            ), # sidebarPanel
                            mainPanel(
-                             radioButtons("equitable", label = "equitable", choices = c("Actual", "Equitable"), selected="Actual"),
+                             radioButtons("equitable", label = "", choices = c("Actual", "Equitable"), selected="Actual"),
                              htmlOutput("specificHighlight"),
                              htmlOutput("relativeHighlight"),
                              htmlOutput("fullSpecific"),
@@ -103,5 +109,6 @@ fillPage(theme = shinytheme("united"),
                              dataTableOutput("Difference"),
                              dataTableOutput("RelativeTable"),
                              dataTableOutput("SpecificTable"),
+                             HTML("<script src='script.js'></script>")
                            ) # mainPanel
           )
