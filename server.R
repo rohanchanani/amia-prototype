@@ -436,6 +436,7 @@ macro=TRUE
 shinyServer(function(input, output, session) {
     hide("Target")
     hide("Dimension")
+    hide("Sorting")
     hide("Question")
     hide("DimLabel")
     hide("heading")
@@ -461,6 +462,7 @@ shinyServer(function(input, output, session) {
       if (input$Target!=""){
         show("Dimension")
         show("Question")
+        show("Sorting")
         show("DimLabel")
         show("heading")
       }
@@ -474,6 +476,7 @@ shinyServer(function(input, output, session) {
       updateSelectInput(session, "Target", selected="")
       hide("Target")
       hide("Dimension")
+      hide("Sorting")
       hide("Question")
       hide("DimLabel")
       hide("heading")
@@ -486,6 +489,7 @@ shinyServer(function(input, output, session) {
     observeEvent(input$Target, {
       if (input$Target!="") {
         show("Dimension")
+        show("Sorting")
         show("Question")
         show("DimLabel")
         show("heading")
@@ -539,6 +543,7 @@ shinyServer(function(input, output, session) {
         hide("fullSpecific") 
         hide("fullRelative") 
         if (input$Target=="") {
+          hide("Sorting")
           hide("Dimension")
         } 
         show("DiagnosticGraph")
@@ -555,6 +560,7 @@ shinyServer(function(input, output, session) {
           hide("Search")
         }
         show("Dimension")
+        show("Sorting")
         show("Question")
         show("DimLabel")
         show("heading")
