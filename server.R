@@ -108,19 +108,10 @@ getDifferences <- function(dim, dimension="", determinant="", target="", metric=
 }
 
 getOptions <- function(dimension, determinant, metric, setting, campus, target) {
-  initialDims <- questions_df %>% distinct(!!as.symbol(dimension)) %>% pull(!!as.symbol(dimension))
-  dimLength <- length(initialDims)
-  if (dimLength > 500) {
-    allRows <- nrow(questions_df)
-    allDims <- c()
-    for (dim in 1:length(initialDims)) {
-      if (nrow(filter(questions_df, !!as.symbol(dimension)==initialDims[dim])) > allRows *3 / dimLength) {
-        allDims <- append(allDims, initialDims[dim])
-      }
-    }
-    print(length(allDims))
+  if (paste(dimension, "top") %in% colnames(questions_df)) {
+    allDims <- questions_df %>% filter(!!as.symbol(paste(dimension, "top"))) %>% distinct(!!as.symbol(dimension)) %>% pull(!!as.symbol(dimension))   
   } else {
-    allDims <- initialDims
+    allDims <- questions_df %>% distinct(!!as.symbol(dimension)) %>% pull(!!as.symbol(dimension))
   }
   differences <- sapply(allDims, getDifferences, dimension=dimension, determinant=determinant, target=target, metric=metric)
   tempFrame <- data.frame(allDims, differences)
