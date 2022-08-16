@@ -97,7 +97,7 @@ diagnosticGraph <- function(determinant, metric, setting, campus, equitable) {
   }
   graphTable['metric'] <- metricValues
   nudge = metricValues %>% sapply(abs) %>% mean() / 15
-  return(ggplot(data=graphTable, aes(x=determinant, y=metric)) + geom_bar(aes(x=determinant), stat='identity') + geom_text(aes(y=metric+nudge*sign(metric), label = signif(metric, digits=2))) + coord_flip() + ggtitle(toTitleCase(paste(metric, "by", determinant))) + labs(x=toTitleCase(determinant), y=toTitleCase(paste("Average",average_units[metric]))))
+  return(ggplot(data=graphTable, aes(x=determinant, y=metric)) + geom_bar(aes(x=determinant), stat='identity') + geom_text(aes(y=metric+nudge*sign(metric), label = signif(metric, digits=2))) + coord_flip() + ggtitle(toTitleCase(paste(metric, "by", determinant))) + labs(x=toTitleCase(determinant), y=toTitleCase(paste("Average",average_units[metric]))) + theme(text = element_text(size = 20)))
 }
 
 getDifferences <- function(dim, dimension="", determinant="", target="", metric="") {
@@ -177,7 +177,7 @@ groupedBar <- function(dimension, determinant, metric, options, setting, campus,
   dets <- rawData %>% colnames()
   for (dim in 1:length(dims)) {
     count <- questions_df %>% filter(!!as.symbol(dimension)==dims[dim]) %>% nrow()
-    dims[dim] = paste(dims[dim],paste("n=",count,sep=""),sep="\n")
+    dims[dim] = paste(str_trunc(dims[dim], width=30),paste("n=",count,sep=""),sep="\n")
   }
   counter = 1
   allVals <- c()
@@ -221,8 +221,9 @@ groupedBar <- function(dimension, determinant, metric, options, setting, campus,
          + coord_cartesian(xlim = c(-0.5, length(dims)+0.5), ylim = c(min(allVals)-0.5, max(allVals)+0.5))
          + coord_flip(clip="off")
          #+ geom_text(position=position_dodge(width=0.75),aes(y=!!as.symbol(metric)+sign(!!as.symbol(metric))*nudge - mini_nudge,fill=!!as.symbol(determinant),label=signif(!!as.symbol(metric), digits=2),hjust=0))
-         + ggtitle(title)
-         + labs(x=dimension, y=paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
+         + ggtitle(str_wrap(title, width=70))
+         + labs(x=dimension, y=paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n"))
+         + theme(text = element_text(size = 20)))
 }
 
 groupedActual <- function(dimension, determinant, metric, options, setting, campus, target, equitable=FALSE) {
@@ -238,7 +239,7 @@ groupedActual <- function(dimension, determinant, metric, options, setting, camp
   detsList <- c()
   for (dim in 1:length(dims)) {
     count <- questions_df %>% filter(!!as.symbol(dimension)==dims[dim]) %>% nrow()
-    dims[dim] = paste(dims[dim],paste("n=",count,sep=""),sep="\n")
+    dims[dim] = paste(str_trunc(dims[dim], width=30),paste("n=",count,sep=""),sep="\n")
   }
   counter = 1
   allVals <- c()
@@ -264,8 +265,9 @@ groupedActual <- function(dimension, determinant, metric, options, setting, camp
          + coord_cartesian(xlim = c(-0.5, length(dims)+0.5), ylim = c(min(allVals)-0.5, max(allVals)+0.5))
          + coord_flip(clip="off")
          #+ geom_text(position=position_dodge(width=0.75),aes(y=!!as.symbol(metric)+sign(!!as.symbol(metric))*nudge - mini_nudge,fill=!!as.symbol(determinant),label=signif(!!as.symbol(metric), digits=2),hjust=0))
-         + ggtitle(title)
-         + labs(x=dimension, y=paste("Average",average_units[metric])))
+         + ggtitle(str_wrap(title, width=70))
+         + labs(x=dimension, y=paste("Average",average_units[metric]))
+         + theme(text = element_text(size = 20)))
 }
 
 positive <- function(number) {
@@ -282,7 +284,7 @@ isolatedBar <- function(dimension, determinant, metric, options, setting, campus
   names(rawData)[1] <-  names(initialData)[1]
   for (dim in 1:nrow(rawData)) {
     count <- questions_df %>% filter(!!as.symbol(dimension)==rawData[dim,1], !!as.symbol(determinant)==target) %>% nrow()
-    rawData[dim,1] = paste(rawData[dim,1],paste("n=",count,sep=""),sep="\n")
+    rawData[dim,1] = paste(str_trunc(rawData[dim,1], width=30),paste("n=",count,sep=""),sep="\n")
   }
   rawData["Difference"] <- initialData %>% pull(!!as.symbol(target)) %>% remove_attributes("names")
   if (equitable) {
@@ -320,8 +322,9 @@ isolatedBar <- function(dimension, determinant, metric, options, setting, campus
          + coord_cartesian(xlim = c(-0.5, nrow(rawData)+0.5), ylim = c(min(targetValues)-0.5, max(targetValues)+0.5))
          + coord_flip(clip="off")
          + geom_text(aes(y=Difference + nudge*sign(Difference),label = signif(Difference, digits=2)))
-         + ggtitle(title)
-         + labs(x=dimension, y=yLabel1))#paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
+         + ggtitle(str_wrap(title, width=70))
+         + labs(x=dimension, y=yLabel1)#paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
+         + theme(text = element_text(size = 20)))
 }
 
 isolatedRelative <- function(dimension, determinant, metric, options, setting, campus, target, equitable=FALSE,  index=5) {
@@ -332,7 +335,7 @@ isolatedRelative <- function(dimension, determinant, metric, options, setting, c
   names(rawData)[1] <-  names(initialData)[1]
   for (dim in 1:nrow(rawData)) {
     count <- questions_df %>% filter(!!as.symbol(dimension)==rawData[dim,1], !!as.symbol(determinant)==target) %>% nrow()
-    rawData[dim,1] = paste(rawData[dim,1],paste("n=",count,sep=""),sep="\n")
+    rawData[dim,1] = paste(str_trunc(rawData[dim,1], width=30),paste("n=",count,sep=""),sep="\n")
   }
   rawData["Ratio"] <- initialData %>% pull(!!as.symbol(target)) %>% remove_attributes("names")
   if (equitable) {
@@ -349,8 +352,9 @@ isolatedRelative <- function(dimension, determinant, metric, options, setting, c
          + geom_bar(stat="identity")
          + coord_flip(clip="off")
          + geom_text(aes(y=Ratio + nudge*sign(Ratio),label = signif(Ratio, digits=2)))
-         + ggtitle(title)
-         + labs(x=dimension, y=yLabel1))#paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
+         + ggtitle(str_wrap(title, width=70))
+         + labs(x=dimension, y=yLabel1)
+         + theme(text = element_text(size = 20)))#paste(yLabel1,str_wrap(yLabel2, width=120),sep="\n\n")))
 }
 
 oldCreateHighlight <- function(outputs, index, xVal, dimension, determinant, target,metric) {
