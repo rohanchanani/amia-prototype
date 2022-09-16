@@ -479,7 +479,7 @@ shinyServer(function(input, output, session) {
       show("macroView")
       macro=FALSE
       updateSelectInput(session, "Target", selected="")
-      updateSelectInput(session, "Dimension", choices = c("", "Zip Code", "Billing Diagnosis", "Admit Diagnosis"), selected="")
+      updateSelectInput(session, "Dimension", choices = c("", "Zip Code", "Actual Diagnosis", "Billing Diagnosis", "Admit Diagnosis"), selected="")
     })
     observeEvent(input$macroView, {
       updateSelectInput(session, "Target", selected="")
@@ -493,7 +493,7 @@ shinyServer(function(input, output, session) {
       hide("macroView")
       macro=TRUE
       updateSelectInput(session, "Target", selected="")
-      updateSelectInput(session, "Dimension", choices = c("", "Zip Code", "Disease"), selected="")
+      updateSelectInput(session, "Dimension", choices = c("", "Zip Code", "Actual Diagnosis", "Billing Diagnosis", "Admit Diagnosis"), selected="")
     })
     observeEvent(input$Target, {
       if (input$Target!="") {

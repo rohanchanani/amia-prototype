@@ -83,7 +83,7 @@ fillPage(theme = shinytheme("united"),
                              
                              radioButtons("Sorting", label = "Which populations am I curious about?", choices = c("Custom", "Most Inequitable"), selected="Custom"),
                              
-                             tags$div(id = "inline", selectInput("Dimension", label = "Refine by Sub-Populations:",choices = c("", "Zip Code", "Billing Diagnosis", "Admit Diagnosis"), selected="")),
+                             tags$div(id = "inline", selectInput("Dimension", label = "Refine by Sub-Populations:",choices = c("", "Zip Code", "Actual Diagnosis", "Billing Diagnosis", "Admit Diagnosis"), selected="")),
                              
                              textInput("Search", label=verbatimTextOutput("SearchVal")),
                              
