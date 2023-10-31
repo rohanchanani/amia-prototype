@@ -11,6 +11,7 @@ This project is an interactive health equity dashboard to address socioeconomic 
 ## Media
 
 <ul>
+  <li><a href="https://www.youtube.com/watch?v=pna1d9befGs">Demo Video</a></li>
   <li><a href="https://github.com/rohanchanani/amia-prototype/blob/main/Rohan%20Chanani%20AMIA%202022.pdf">Project Slides</a></li>
   <li><a href="https://github.com/rohanchanani/amia-prototype/blob/main/RohanChanani_AMIA_2022.pptx.jpg">Project Poster</li>
   <li><a href="https://github.com/rohanchanani/amia-prototype/blob/main/Rohan%20Chanani%20AMIA%20Manuscript.docx.pdf">Project Manuscript</li>
